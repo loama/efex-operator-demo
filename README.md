@@ -1,5 +1,97 @@
-# EFEX Operator demo
+# EFEX Operator Demo
 
-EFEX Operator is a public demonstration of a universal treasury application for iOS, Android, and web. It uses synthetic company data and a local API. It never connects to a bank or moves real money.
+EFEX Operator is a working treasury product demonstration for iOS, Android, and web. The interface follows the visual language of the EFEX website while every account, company, person, and transaction remains synthetic.
 
-The repository is under active construction. Complete setup and verification instructions will be added with the application.
+No operation connects to a bank or moves real money.
+
+## What works
+
+1. A responsive dashboard reads balances, accounts, and activity from the API.
+
+2. Beneficiary creation validates input and persists it in local SQLite.
+
+3. Payment creation requests a conversion quote, creates a draft, and submits it into a simulated processing state.
+
+4. Currency conversion uses a live request to the local quote endpoint.
+
+5. Account statements are generated as valid synthetic PDF documents.
+
+6. The assistant answers questions about balances, payments, and statements using demo data.
+
+7. A Kapso webhook adapter can answer inbound WhatsApp messages when credentials are present. A simulation endpoint proves the same behavior without credentials.
+
+8. Future products are visible in a quiet disabled state so the product roadmap is clear without suggesting that incomplete flows already work.
+
+## Repository structure
+
+```text
+apps
+  api       Bun, Hono, SQLite, PDF generation, Kapso adapter
+  mobile    Expo Router application for iOS, Android, and web
+packages
+  contracts Shared Zod schemas and TypeScript types
+docs
+  Architecture and implementation notes
+```
+
+## Local setup
+
+Requirements are Bun 1.3 or newer, Xcode with an iOS simulator for native testing, and an Expo compatible environment.
+
+```bash
+bun install --frozen-lockfile
+```
+
+Start the API in one terminal.
+
+```bash
+bun run dev:api
+```
+
+Start the application in another terminal.
+
+```bash
+bun run dev:app
+```
+
+Press `i` to open the iOS simulator, `a` to open an Android emulator, or `w` to open the web app.
+
+The app reads the API at `http://127.0.0.1:8787` on iOS and web. Android uses `http://10.0.2.2:8787`. Override either value with `EXPO_PUBLIC_API_URL`.
+
+Reset all demo data at any time.
+
+```bash
+curl -X POST http://127.0.0.1:8787/v1/demo/reset
+```
+
+## Kapso setup
+
+Copy `apps/api/.env.example` to `apps/api/.env` and provide the following values only when testing with a number you control.
+
+```text
+KAPSO_API_KEY
+KAPSO_PHONE_NUMBER_ID
+KAPSO_WEBHOOK_SECRET
+PUBLIC_API_ORIGIN
+```
+
+Register `POST /webhooks/kapso` for the `whatsapp.message.received` event on a number scoped Kapso webhook. The handler verifies `X-Webhook-Signature`, handles single or buffered text events, generates an answer from the same demo service as the app, and sends text or a statement document through Kapso.
+
+Without credentials, use `POST /v1/whatsapp/simulate` with `{ "message": "Necesito mi estado de cuenta" }`.
+
+Kapso setup follows the official [TypeScript SDK guide](https://docs.kapso.ai/docs/whatsapp/typescript-sdk/introduction) and [webhook guide](https://docs.kapso.ai/docs/platform/webhooks/overview).
+
+## Verification
+
+```bash
+bun run test
+bun run typecheck
+bun run lint
+bun run build:web
+```
+
+The browser flow also creates a beneficiary, reviews and submits a simulated payment, and asks the assistant for an account answer. Native verification opens the same Expo app in an iOS simulator against the local API.
+
+## Safety boundary
+
+This repository is an assessment demo. It contains no production credentials, bank connectors, customer data, or real payment execution. The payment state machine stops at a local simulated state. Connecting it to financial infrastructure would require a separate security, compliance, authorization, and audit design.
