@@ -18,7 +18,7 @@ No operation connects to a bank or moves real money.
 
 6. The assistant answers questions about balances, payments, and statements using demo data.
 
-7. A Kapso webhook adapter can answer inbound WhatsApp messages when credentials are present. A simulation endpoint proves the same behavior without credentials.
+7. A Kapso webhook adapter can answer inbound WhatsApp messages when credentials are present. Persistent message claims prevent duplicate replies. A simulation endpoint proves the same behavior without credentials.
 
 8. Future products are visible in a quiet disabled state so the product roadmap is clear without suggesting that incomplete flows already work.
 
@@ -75,7 +75,7 @@ KAPSO_WEBHOOK_SECRET
 PUBLIC_API_ORIGIN
 ```
 
-Register `POST /webhooks/kapso` for the `whatsapp.message.received` event on a number scoped Kapso webhook. The handler verifies `X-Webhook-Signature`, handles single or buffered text events, generates an answer from the same demo service as the app, and sends text or a statement document through Kapso.
+Register `POST /webhooks/kapso` for the `whatsapp.message.received` event on a number scoped Kapso webhook. The handler verifies `X-Webhook-Signature`, rejects malformed payloads, handles single or buffered text events, claims message identifiers in SQLite, generates an answer from the same demo service as the app, and sends text or a statement document through Kapso.
 
 Without credentials, use `POST /v1/whatsapp/simulate` with `{ "message": "Necesito mi estado de cuenta" }`.
 
