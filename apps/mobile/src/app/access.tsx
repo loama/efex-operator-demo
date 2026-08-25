@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { AppShell } from "../components/app-shell";
 import { Avatar, Button, Card, Pill, SectionTitle } from "../components/ui";
+import { useHydratedWindowWidth } from "../hooks/use-hydrated-window-width";
 import { colors, fonts } from "../lib/theme";
 
 const members = [
@@ -10,7 +11,7 @@ const members = [
 ];
 
 export default function AccessScreen() {
-  const desktop = useWindowDimensions().width >= 900;
+  const desktop = useHydratedWindowWidth() >= 900;
   return (
     <AppShell title="Acceso de la empresa" subtitle="Consulta usuarios, aprobaciones y controles de la cuenta demo." action={<Button disabled label="Invitar usuario" onPress={() => undefined} />}>
       <Card style={styles.notice}>

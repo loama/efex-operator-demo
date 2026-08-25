@@ -2,9 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import type { Beneficiary, Payment, Quote } from "@efex/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Animated, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppShell } from "../../components/app-shell";
 import { Avatar, Button, Card, EmptyState, ErrorState, Field, LoadingState, Pill } from "../../components/ui";
+import { useHydratedWindowWidth } from "../../hooks/use-hydrated-window-width";
 import { api } from "../../lib/api";
 import { initials, money } from "../../lib/format";
 import { colors, fonts } from "../../lib/theme";
@@ -16,7 +17,7 @@ export default function NewPaymentScreen() {
   const [step, setStep] = useState<Step>("beneficiary"); const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]); const [selected, setSelected] = useState<Beneficiary>();
   const [amount, setAmount] = useState(params.amount ?? "25000"); const [reference, setReference] = useState("Invoice 1088"); const [quote, setQuote] = useState<Quote>(); const [payment, setPayment] = useState<Payment>();
   const [loading, setLoading] = useState(true); const [error, setError] = useState<string>(); const [scale] = useState(() => new Animated.Value(0.75));
-  const narrow = useWindowDimensions().width < 480;
+  const narrow = useHydratedWindowWidth() < 480;
 
   useEffect(() => { void api.beneficiaries().then((items) => { setBeneficiaries(items); const match = items.find((item) => item.id === params.beneficiaryId); if (match) { setSelected(match); setStep("amount"); } }).catch((reason) => setError(reason instanceof Error ? reason.message : "Error desconocido")).finally(() => setLoading(false)); }, [params.beneficiaryId]);
   useEffect(() => { if (step === "done") Animated.spring(scale, { toValue: 1, friction: 5, tension: 80, useNativeDriver: Platform.OS !== "web" }).start(); }, [scale, step]);

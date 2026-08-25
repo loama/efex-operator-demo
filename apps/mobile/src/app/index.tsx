@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useCallback } from "react";
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppShell } from "../components/app-shell";
 import { Button, Card, ErrorState, LoadingState, Pill, SectionTitle } from "../components/ui";
 import { useApiResource } from "../hooks/use-api-resource";
+import { useHydratedWindowWidth } from "../hooks/use-hydrated-window-width";
 import { api } from "../lib/api";
 import { compactMoney, money } from "../lib/format";
 import { colors, fonts } from "../lib/theme";
@@ -12,7 +13,7 @@ import { colors, fonts } from "../lib/theme";
 export default function DashboardScreen() {
   const loader = useCallback(() => api.dashboard(), []);
   const { data, error, loading, reload } = useApiResource(loader);
-  const desktop = useWindowDimensions().width >= 900;
+  const desktop = useHydratedWindowWidth() >= 900;
   return (
     <AppShell title="Buenos días, Santiago" subtitle="Todo lo que necesitas para operar tu tesorería global." action={<Button icon="arrow-up" label="Enviar dinero" onPress={() => router.push("/payments/new")} />}>
       {loading ? <LoadingState label="Consultando tus cuentas" /> : null}

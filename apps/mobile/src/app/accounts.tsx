@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useCallback } from "react";
-import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { AppShell } from "../components/app-shell";
 import { Button, Card, EmptyState, ErrorState, LoadingState, Pill, SectionTitle } from "../components/ui";
 import { useApiResource } from "../hooks/use-api-resource";
+import { useHydratedWindowWidth } from "../hooks/use-hydrated-window-width";
 import { api } from "../lib/api";
 import { money } from "../lib/format";
 import { colors, fonts } from "../lib/theme";
@@ -12,7 +13,7 @@ import { colors, fonts } from "../lib/theme";
 export default function AccountsScreen() {
   const loader = useCallback(() => api.dashboard(), []);
   const resource = useApiResource(loader);
-  const desktop = useWindowDimensions().width >= 900;
+  const desktop = useHydratedWindowWidth() >= 900;
   return (
     <AppShell title="Cuentas" subtitle="Controla saldos globales desde un solo lugar." action={<Button label="Convertir divisas" onPress={() => router.push("/convert")} />}>
       {resource.loading ? <LoadingState /> : null}

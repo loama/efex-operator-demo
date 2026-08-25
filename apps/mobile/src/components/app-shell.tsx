@@ -2,8 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import type { Href } from "expo-router";
 import { router, usePathname } from "expo-router";
 import { useState, type PropsWithChildren } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useHydratedWindowWidth } from "../hooks/use-hydrated-window-width";
 import { colors, fonts } from "../lib/theme";
 import { Avatar, Pill } from "./ui";
 
@@ -18,7 +19,7 @@ const navigation = [
 const future = ["Tarjetas corporativas", "Coberturas", "Crédito"];
 
 export function AppShell({ children, title, subtitle, action }: PropsWithChildren<{ title: string; subtitle?: string; action?: React.ReactNode }>) {
-  const { width } = useWindowDimensions();
+  const width = useHydratedWindowWidth();
   const desktop = width >= 900;
   const pathname = usePathname();
   const [focusedControl, setFocusedControl] = useState<string>();
