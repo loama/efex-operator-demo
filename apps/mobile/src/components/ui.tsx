@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import type { PropsWithChildren, ReactNode } from "react";
+import { useState, type PropsWithChildren, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, type TextInputProps, View, type StyleProp, type ViewStyle } from "react-native";
 import { colors, fonts } from "../lib/theme";
 
@@ -22,17 +22,22 @@ export function Button({
   loading?: boolean;
   icon?: keyof typeof Ionicons.glyphMap;
 }) {
+  const [focused, setFocused] = useState(false);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ busy: loading, disabled: disabled || loading }}
       disabled={disabled || loading}
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
         variant === "secondary" && styles.buttonSecondary,
         variant === "quiet" && styles.buttonQuiet,
         (disabled || loading) && styles.buttonDisabled,
+        focused && (variant === "primary" ? styles.buttonFocusedPrimary : styles.buttonFocusedLight),
         pressed && styles.buttonPressed,
       ]}
     >
@@ -49,14 +54,18 @@ export function Button({
 }
 
 export function Field({ label, error, ...props }: TextInputProps & { label: string; error?: string }) {
+  const [focused, setFocused] = useState(false);
+  const { onBlur, onFocus, ...inputProps } = props;
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
         accessibilityLabel={label}
+        onBlur={(event) => { setFocused(false); onBlur?.(event); }}
+        onFocus={(event) => { setFocused(true); onFocus?.(event); }}
         placeholderTextColor={colors.quiet}
-        style={[styles.field, error ? styles.fieldError : undefined]}
-        {...props}
+        style={[styles.field, focused && styles.fieldFocused, error ? styles.fieldError : undefined]}
+        {...inputProps}
       />
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
@@ -126,16 +135,19 @@ export function EmptyState({ title, message, action }: { title: string; message:
 
 const styles = StyleSheet.create({
   card: { backgroundColor: colors.paper, borderColor: colors.line, borderRadius: 12, borderWidth: 1, padding: 18 },
-  button: { alignItems: "center", backgroundColor: colors.ink, borderColor: colors.ink, borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 8, justifyContent: "center", minHeight: 46, paddingHorizontal: 20 },
+  button: { alignItems: "center", backgroundColor: colors.ink, borderColor: colors.ink, borderRadius: 999, borderWidth: 2, flexDirection: "row", gap: 8, justifyContent: "center", minHeight: 46, paddingHorizontal: 20 },
   buttonSecondary: { backgroundColor: colors.paper },
   buttonQuiet: { backgroundColor: colors.canvas, borderColor: colors.line },
   buttonDisabled: { opacity: 0.45 },
+  buttonFocusedPrimary: { borderColor: colors.yellow },
+  buttonFocusedLight: { borderColor: colors.inkSoft },
   buttonPressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },
   buttonLabel: { color: colors.paper, fontFamily: fonts.bodySemiBold, fontSize: 14 },
   buttonLabelDark: { color: colors.ink },
   fieldWrap: { gap: 7 },
   fieldLabel: { color: colors.ink, fontFamily: fonts.bodyMedium, fontSize: 13 },
-  field: { backgroundColor: colors.paper, borderColor: colors.line, borderRadius: 10, borderWidth: 1, color: colors.ink, fontFamily: fonts.body, fontSize: 15, minHeight: 50, paddingHorizontal: 14 },
+  field: { backgroundColor: colors.paper, borderColor: colors.line, borderRadius: 10, borderWidth: 2, color: colors.ink, fontFamily: fonts.body, fontSize: 15, minHeight: 50, paddingHorizontal: 14 },
+  fieldFocused: { borderColor: colors.ink },
   fieldError: { borderColor: colors.red },
   errorText: { color: colors.red, fontFamily: fonts.body, fontSize: 12 },
   pill: { alignSelf: "flex-start", backgroundColor: colors.canvas, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },

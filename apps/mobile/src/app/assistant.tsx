@@ -24,7 +24,7 @@ export default function AssistantScreen() {
   return <AppShell title="Asistente EFEX" subtitle="Las mismas operaciones pueden exponerse en WhatsApp, Slack, Teams o SMS.">
     <View style={styles.layout}>
       <View style={styles.chatColumn}>
-        <View style={styles.channelHeader}><View style={styles.channelIcon}><Ionicons color={colors.ink} name="chatbubble-ellipses" size={20} /></View><View style={styles.flex}><Text style={styles.channelTitle}>EFEX por WhatsApp</Text><Text style={styles.channelMeta}>La demo responde a mensajes entrantes. Las acciones se envían como texto, botones y archivos compatibles.</Text></View><Pill tone="success">En línea</Pill></View>
+        <View style={styles.channelHeader}><View style={styles.channelIcon}><Ionicons color={colors.ink} name="chatbubble-ellipses" size={20} /></View><View style={styles.flex}><Text style={styles.channelTitle}>EFEX por WhatsApp</Text><Text style={styles.channelMeta}>La demo responde a mensajes entrantes. Las acciones actuales se envían como texto, enlaces y documentos compatibles.</Text></View><Pill tone="success">En línea</Pill></View>
         <Card style={styles.chat}>
           <View style={styles.messages}>{messages.map((message) => <View key={message.id} style={[styles.bubble, message.role === "user" ? styles.userBubble : styles.assistantBubble]}>
             <Text style={[styles.bubbleText, message.role === "user" && styles.userText]}>{message.text}</Text>
@@ -37,7 +37,7 @@ export default function AssistantScreen() {
       </View>
       <View style={styles.sideColumn}>
         <Text style={styles.quickTitle}>Preguntas rápidas</Text>{prompts.map((prompt) => <Button key={prompt} label={prompt} onPress={() => void send(prompt)} variant="secondary" />)}
-        <Card style={styles.note}><Pill tone="yellow">CANAL DEMO</Pill><Text style={styles.noteTitle}>Sin imágenes generadas</Text><Text style={styles.noteText}>Saldos y estados de pago se responden con texto y botones nativos. Los estados de cuenta se adjuntan como documentos. Así se mantiene la experiencia clara y compatible con WhatsApp.</Text></Card>
+        <Card style={styles.note}><Pill tone="yellow">CANAL DEMO</Pill><Text style={styles.noteTitle}>Sin imágenes generadas</Text><Text style={styles.noteText}>Saldos y estados de pago se responden con texto y enlaces. Los estados de cuenta se adjuntan como documentos. Así se mantiene la experiencia clara y compatible con WhatsApp.</Text></Card>
       </View>
     </View>
   </AppShell>;

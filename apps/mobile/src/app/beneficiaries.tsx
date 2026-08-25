@@ -20,7 +20,8 @@ export default function BeneficiariesScreen() {
     try { setItems(await api.beneficiaries()); } catch (reason) { setError(reason instanceof Error ? reason.message : "Error desconocido"); } finally { setLoading(false); }
   }, []);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
-  const filtered = items.filter((item) => item.name.toLocaleLowerCase("es").includes(query.toLocaleLowerCase("es")));
+  const normalizedQuery = query.toLocaleLowerCase("es");
+  const filtered = items.filter((item) => `${item.name} ${item.bank}`.toLocaleLowerCase("es").includes(normalizedQuery));
 
   return (
     <AppShell title="Beneficiarios" subtitle="Administra los destinos autorizados para tus pagos." action={<Button icon="person-add-outline" label="Añadir beneficiario" onPress={() => router.push("/beneficiaries/new")} />}>
