@@ -3,11 +3,11 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
-import { z } from "zod";
+import { z, ZodError } from "zod";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { createDatabase, ensureSeeded, seedDatabase, type EfexDatabase } from "./database";
 import { createTreasuryService, TreasuryValidationError } from "./service";
-import { answerKapsoWebhook, verifyKapsoSignature } from "./kapso";
+import { answerKapsoWebhook, parseKapsoMessages, verifyKapsoSignature } from "./kapso";
 
 const quoteQuerySchema = z.object({
   sourceCurrency: currencySchema,
@@ -84,9 +84,17 @@ export function createApp(database?: EfexDatabase) {
     if (!verifyKapsoSignature(rawBody, context.req.header("x-webhook-signature"), process.env.KAPSO_WEBHOOK_SECRET)) {
       return context.json({ error: "Invalid webhook signature" }, 401);
     }
-    const eventType = context.req.header("x-webhook-event") ?? JSON.parse(rawBody).type;
+    let payload: unknown;
+    try {
+      payload = JSON.parse(rawBody);
+      parseKapsoMessages(payload);
+    } catch (error) {
+      if (error instanceof SyntaxError || error instanceof ZodError) return context.json({ error: "Invalid webhook payload" }, 400);
+      throw error;
+    }
+    const eventType = context.req.header("x-webhook-event") ?? (payload as { type?: string }).type;
     if (eventType !== "whatsapp.message.received") return context.json({ ok: true, processed: 0 });
-    const answers = await answerKapsoWebhook(service, JSON.parse(rawBody));
+    const answers = await answerKapsoWebhook(service, payload);
     return context.json({ ok: true, processed: answers.length });
   });
   app.post("/v1/demo/reset", (context) => {

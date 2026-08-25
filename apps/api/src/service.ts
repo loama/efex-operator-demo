@@ -174,12 +174,15 @@ export function createTreasuryService(db: EfexDatabase) {
     };
   }
 
-  function createPayment(input: CreatePaymentInput): Payment {
+  const createPaymentTransaction = db.transaction((input: CreatePaymentInput): Payment => {
     const beneficiary = listBeneficiaries().find((item) => item.id === input.beneficiaryId);
     if (!beneficiary) throw new Error("Beneficiary not found");
     if (beneficiary.currency !== input.destinationCurrency) throw new TreasuryValidationError("Destination currency must match beneficiary currency");
     const account = db.query<AccountRow, string>("SELECT * FROM accounts WHERE currency = ?").get(input.sourceCurrency);
-    if (!account || input.sourceAmount > account.available) throw new TreasuryValidationError("Insufficient demo funds");
+    const reservation = db.query<{ reserved: number }, string>(
+      "SELECT COALESCE(SUM(source_amount), 0) AS reserved FROM payments WHERE source_currency = ? AND status IN ('draft', 'processing')",
+    ).get(input.sourceCurrency)?.reserved ?? 0;
+    if (!account || input.sourceAmount + reservation > account.available) throw new TreasuryValidationError("Insufficient demo funds");
     const priced = quote(input.sourceCurrency, input.destinationCurrency, input.sourceAmount);
     const id = `payment_${crypto.randomUUID()}`;
     const createdAt = new Date().toISOString();
@@ -199,6 +202,10 @@ export function createTreasuryService(db: EfexDatabase) {
       $updatedAt: createdAt,
     });
     return listPayments().find((item) => item.id === id)!;
+  });
+
+  function createPayment(input: CreatePaymentInput): Payment {
+    return createPaymentTransaction(input);
   }
 
   function submitPayment(id: string): Payment | undefined {
@@ -249,6 +256,14 @@ export function createTreasuryService(db: EfexDatabase) {
         action: { label: "Ver cuentas", route: "/accounts" },
       };
     }
+    if (normalized.includes("beneficiario") || normalized.includes("destino")) {
+      const beneficiaries = listBeneficiaries();
+      return {
+        id: crypto.randomUUID(),
+        text: `Tienes ${beneficiaries.length} beneficiarios en la cuenta demo. Puedes consultarlos o añadir un destino nuevo desde Beneficiarios.`,
+        action: { label: "Ver beneficiarios", route: "/beneficiaries" },
+      };
+    }
     return {
       id: crypto.randomUUID(),
       text: "Puedo ayudarte con saldos, pagos, beneficiarios y estados de cuenta. Esta respuesta usa únicamente datos sintéticos de la demo.",
@@ -256,7 +271,19 @@ export function createTreasuryService(db: EfexDatabase) {
     };
   }
 
-  return { assistant, createBeneficiary, createPayment, dashboard, listBeneficiaries, listPayments, quote, statements, submitPayment };
+  function claimKapsoMessage(messageId: string): boolean {
+    const result = db.prepare("INSERT INTO kapso_messages VALUES ($messageId, $createdAt) ON CONFLICT(message_id) DO NOTHING").run({
+      $messageId: messageId,
+      $createdAt: new Date().toISOString(),
+    });
+    return result.changes === 1;
+  }
+
+  function releaseKapsoMessage(messageId: string) {
+    db.prepare("DELETE FROM kapso_messages WHERE message_id = ?").run(messageId);
+  }
+
+  return { assistant, claimKapsoMessage, createBeneficiary, createPayment, dashboard, listBeneficiaries, listPayments, quote, releaseKapsoMessage, statements, submitPayment };
 }
 
 export type TreasuryService = ReturnType<typeof createTreasuryService>;

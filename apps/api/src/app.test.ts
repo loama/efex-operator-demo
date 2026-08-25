@@ -1,19 +1,25 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { createHmac } from "node:crypto";
 import { createApp } from "./app";
 import { createDatabase, seedDatabase, type EfexDatabase } from "./database";
-import { answerKapsoWebhook, resetKapsoIdempotencyForTests } from "./kapso";
+import { answerKapsoWebhook } from "./kapso";
+import { createTreasuryService } from "./service";
 
 let db: EfexDatabase;
 let app: ReturnType<typeof createApp>["app"];
+const originalWebhookSecret = process.env.KAPSO_WEBHOOK_SECRET;
 
 beforeEach(() => {
-  resetKapsoIdempotencyForTests();
   db = createDatabase(":memory:");
   seedDatabase(db);
   app = createApp(db).app;
 });
 
-afterEach(() => db.close());
+afterEach(() => {
+  if (originalWebhookSecret) process.env.KAPSO_WEBHOOK_SECRET = originalWebhookSecret;
+  else delete process.env.KAPSO_WEBHOOK_SECRET;
+  db.close();
+});
 
 describe("EFEX demo API", () => {
   test("returns a seeded dashboard", async () => {
@@ -91,6 +97,14 @@ describe("EFEX demo API", () => {
     expect(response.status).toBe(422);
   });
 
+  test("rejects aggregate payment reservations over the available balance", async () => {
+    const input = { beneficiaryId: "beneficiary_frutella", sourceCurrency: "USD", destinationCurrency: "MXN", sourceAmount: 500000, reference: "Reservation check" };
+    const first = await app.request("/v1/payments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+    const second = await app.request("/v1/payments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(422);
+  });
+
   test("answers assistant questions with app actions", async () => {
     const response = await app.request("/v1/assistant", {
       method: "POST",
@@ -100,6 +114,14 @@ describe("EFEX demo API", () => {
     const body = await response.json();
     expect(body.text).toContain("saldo consolidado");
     expect(body.action.route).toBe("/accounts");
+
+    const beneficiaries = await app.request("/v1/assistant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "Muéstrame mis beneficiarios" }),
+    });
+    const beneficiaryAnswer = await beneficiaries.json();
+    expect(beneficiaryAnswer.action.route).toBe("/beneficiaries");
   });
 
   test("simulates an inbound WhatsApp message without credentials", async () => {
@@ -123,13 +145,30 @@ describe("EFEX demo API", () => {
     expect(response.status).toBe(401);
   });
 
-  test("deduplicates repeated Kapso messages", async () => {
-    const service = createApp(db).service;
+  test("deduplicates concurrent Kapso messages and persists the claim", async () => {
+    const service = createTreasuryService(db);
     const payload = { message: { id: "wamid.100", type: "text", text: { body: "saldo" } }, phone_number_id: "demo_number" };
-    const first = await answerKapsoWebhook(service, payload);
-    const second = await answerKapsoWebhook(service, payload);
-    expect(first[0]?.duplicate).toBeUndefined();
-    expect(second[0]?.duplicate).toBe(true);
+    const concurrent = await Promise.all([answerKapsoWebhook(service, payload), answerKapsoWebhook(service, payload)]);
+    expect(concurrent.flat().filter((answer) => answer.duplicate).length).toBe(1);
+    const restartedService = createTreasuryService(db);
+    const repeated = await answerKapsoWebhook(restartedService, payload);
+    expect(repeated[0]?.duplicate).toBe(true);
+  });
+
+  test("rejects signed malformed Kapso payloads", async () => {
+    const secret = "test webhook secret";
+    process.env.KAPSO_WEBHOOK_SECRET = secret;
+    const request = async (body: string) => app.request("/webhooks/kapso", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Webhook-Event": "whatsapp.message.received",
+        "X-Webhook-Signature": createHmac("sha256", secret).update(body).digest("hex"),
+      },
+      body,
+    });
+    expect((await request("not json")).status).toBe(400);
+    expect((await request(JSON.stringify({ type: "whatsapp.message.received", data: {} }))).status).toBe(400);
   });
 
   test("blocks public demo reset unless explicitly enabled", async () => {
