@@ -19,3 +19,5 @@ jobs:
       - run: bun run typecheck
       - run: bun run lint
       - run: bun run build:web
+      - run: bun run --cwd apps/mobile install:web-browser
+      - run: bun run test:web-hydration

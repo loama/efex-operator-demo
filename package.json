@@ -18,6 +18,7 @@
     "test": "bun run test:contracts && bun run test:api && bun run test:mobile",
     "typecheck": "bun run --cwd packages/contracts typecheck && bun run --cwd apps/api typecheck && bun run --cwd apps/mobile typecheck",
     "lint": "bun run --cwd apps/mobile lint",
-    "build:web": "bun run --cwd apps/mobile build:web"
+    "build:web": "bun run --cwd apps/mobile build:web",
+    "test:web-hydration": "bun run --cwd apps/mobile test:web-hydration"
   }
 }

@@ -1,17 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useCallback } from "react";
-import { Linking, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Linking, StyleSheet, Text, View } from "react-native";
 import { AppShell } from "../components/app-shell";
 import { Button, Card, EmptyState, ErrorState, LoadingState, Pill } from "../components/ui";
 import { useApiResource } from "../hooks/use-api-resource";
+import { useHydratedWindowWidth } from "../hooks/use-hydrated-window-width";
 import { API_ORIGIN, api } from "../lib/api";
 import { money } from "../lib/format";
 import { colors, fonts } from "../lib/theme";
 
 export default function StatementsScreen() {
   const loader = useCallback(() => api.statements(), []); const resource = useApiResource(loader);
-  const narrow = useWindowDimensions().width < 520;
+  const narrow = useHydratedWindowWidth() < 520;
   return <AppShell title="Estados de cuenta" subtitle="Documentos sintéticos disponibles para la cuenta USD.">
     {resource.loading ? <LoadingState label="Consultando documentos" /> : null}
     {resource.error ? <ErrorState message={resource.error} onRetry={() => void resource.reload()} /> : null}
