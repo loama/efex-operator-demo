@@ -4,7 +4,7 @@ export const colors = {
   paper: "#FFFFFF",
   canvas: "#F5F5F5",
   line: "#E5E5E5",
-  muted: "#777777",
+  muted: "#666666",
   quiet: "#A3A3A3",
   yellow: "#F5F87A",
   green: "#117A38",

@@ -29,7 +29,7 @@ export default function BeneficiariesScreen() {
       {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
       {!loading && !error && !filtered.length ? <EmptyState title="Sin resultados" message="No encontramos beneficiarios con ese nombre. Puedes cambiar la búsqueda o añadir uno nuevo." action={<Button label="Añadir beneficiario" onPress={() => router.push("/beneficiaries/new")} />} /> : null}
       {filtered.length ? <Card style={styles.list}>{filtered.map((item, index) => (
-        <Pressable accessibilityRole="button" key={item.id} onPress={() => router.push({ pathname: "/payments/new", params: { beneficiaryId: item.id } })} style={[styles.row, index > 0 && styles.rowBorder]}>
+        <Pressable accessibilityLabel={`Enviar dinero a ${item.name}`} accessibilityRole="button" key={item.id} onPress={() => router.push({ pathname: "/payments/new", params: { beneficiaryId: item.id } })} style={[styles.row, index > 0 && styles.rowBorder]}>
           <Avatar label={initials(item.name)} />
           <View style={styles.copy}><Text style={styles.name}>{item.name}</Text><Text style={styles.meta}>{item.country} · {item.bank} · {item.accountNumber}</Text></View>
           <Pill tone={item.status === "active" ? "success" : "warning"}>{item.status === "active" ? "Activo" : "Pendiente"}</Pill>

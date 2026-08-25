@@ -27,19 +27,19 @@ export default function DashboardScreen() {
             </Card>
             <Card style={styles.metricCard}>
               <View style={styles.metricIcon}><Ionicons color={colors.green} name="arrow-down" size={18} /></View>
-              <Text style={styles.metricLabel}>Recibido este mes</Text><Text style={styles.metricValue}>{compactMoney(data.receivedThisMonth, "USD")}</Text>
+              <Text style={styles.metricLabel}>Ingresos demo</Text><Text style={styles.metricValue}>{compactMoney(data.receivedThisMonth, "USD")}</Text>
             </Card>
             <Card style={styles.metricCard}>
               <View style={styles.metricIconDark}><Ionicons color={colors.paper} name="arrow-up" size={18} /></View>
-              <Text style={styles.metricLabel}>Enviado este mes</Text><Text style={styles.metricValue}>{compactMoney(data.sentThisMonth, "USD")}</Text>
+              <Text style={styles.metricLabel}>Pagos demo</Text><Text style={styles.metricValue}>{compactMoney(data.sentThisMonth, "USD")}</Text>
             </Card>
           </View>
           <View style={[styles.mainGrid, !desktop && styles.mainGridMobile]}>
             <View style={styles.gridColumn}>
-              <SectionTitle title="Tus cuentas" action={<Pressable onPress={() => router.push("/accounts")}><Text style={styles.link}>Ver todas</Text></Pressable>} />
+              <SectionTitle title="Tus cuentas" action={<Pressable accessibilityLabel="Ver todas las cuentas" accessibilityRole="button" onPress={() => router.push("/accounts")}><Text style={styles.link}>Ver todas</Text></Pressable>} />
               <Card style={styles.flushCard}>
                 {data.accounts.map((account, index) => (
-                  <Pressable key={account.id} onPress={() => router.push("/accounts")} style={[styles.accountRow, index > 0 && styles.rowBorder]}>
+                  <Pressable accessibilityLabel={`Abrir cuenta ${account.name}`} accessibilityRole="button" key={account.id} onPress={() => router.push("/accounts")} style={[styles.accountRow, index > 0 && styles.rowBorder]}>
                     <View style={styles.currencyMark}><Text style={styles.currencyMarkText}>{account.currency[0]}</Text></View>
                     <View style={styles.rowCopy}><Text style={styles.rowTitle}>{account.name}</Text><Text style={styles.rowMeta}>{account.accountNumber}</Text></View>
                     <View style={styles.rowAmount}><Text style={styles.rowValue}>{money(account.balance, account.currency)}</Text><Text style={styles.rowMeta}>Disponible {money(account.available, account.currency)}</Text></View>
@@ -49,7 +49,7 @@ export default function DashboardScreen() {
               </Card>
             </View>
             <View style={styles.gridColumn}>
-              <SectionTitle title="Actividad reciente" action={<Pressable onPress={() => router.push("/activity")}><Text style={styles.link}>Ver todo</Text></Pressable>} />
+              <SectionTitle title="Actividad reciente" action={<Pressable accessibilityLabel="Ver toda la actividad" accessibilityRole="button" onPress={() => router.push("/activity")}><Text style={styles.link}>Ver todo</Text></Pressable>} />
               <Card style={styles.flushCard}>
                 {data.activity.slice(0, 4).map((item, index) => (
                   <View key={item.id} style={[styles.activityRow, index > 0 && styles.rowBorder]}>

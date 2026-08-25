@@ -20,7 +20,7 @@ export default function ConvertScreen() {
       <View style={styles.destination}><Text style={styles.destinationLabel}>Recibirás</Text><Text style={styles.destinationValue}>{quote ? money(quote.destinationAmount, "MXN") : "Cotiza para ver el monto"}</Text></View>
       {quote ? <View style={styles.details}><Text style={styles.detail}>Tipo de cambio: 1 USD = {quote.rate.toFixed(2)} MXN</Text><Text style={styles.detail}>Comisión: {money(quote.fee, "USD")}</Text></View> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {!quote ? <Button disabled={Number(amount) <= 0} label="Obtener cotización" loading={loading} onPress={() => void calculate()} /> : <><Button label="Usar en un pago" onPress={() => router.push("/payments/new")} /><Button label="Nueva cotización" onPress={() => setQuote(undefined)} variant="secondary" /></>}
+      {!quote ? <Button disabled={Number(amount) <= 0} label="Obtener cotización" loading={loading} onPress={() => void calculate()} /> : <><Button label="Usar en un pago" onPress={() => router.push({ pathname: "/payments/new", params: { amount: String(quote.sourceAmount) } })} /><Button label="Nueva cotización" onPress={() => setQuote(undefined)} variant="secondary" /></>}
     </Card>
   </AppShell>;
 }

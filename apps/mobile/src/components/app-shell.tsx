@@ -41,7 +41,7 @@ export function AppShell({ children, title, subtitle, action }: PropsWithChildre
               {navigation.map((item) => {
                 const active = item.route === "/" ? pathname === "/" : pathname.startsWith(item.route);
                 return (
-                  <Pressable accessibilityLabel={item.label} accessibilityRole="button" key={item.route} onPress={() => go(item.route)} style={[styles.navItem, active && styles.navItemActive]}>
+                  <Pressable accessibilityLabel={item.label} accessibilityRole="button" accessibilityState={{ selected: active }} key={item.route} onPress={() => go(item.route)} style={[styles.navItem, active && styles.navItemActive]}>
                     <Ionicons color={active ? colors.ink : "#B9B9B9"} name={item.icon} size={19} />
                     <Text style={[styles.navText, active && styles.navTextActive]}>{item.label}</Text>
                   </Pressable>
@@ -94,9 +94,9 @@ export function AppShell({ children, title, subtitle, action }: PropsWithChildre
         {navigation.map((item) => {
           const active = item.route === "/" ? pathname === "/" : pathname.startsWith(item.route);
           return (
-            <Pressable accessibilityLabel={item.label} accessibilityRole="button" key={item.route} onPress={() => go(item.route)} style={styles.bottomItem}>
+            <Pressable accessibilityLabel={item.label} accessibilityRole="button" accessibilityState={{ selected: active }} key={item.route} onPress={() => go(item.route)} style={styles.bottomItem}>
               <View style={[styles.bottomIcon, active && styles.bottomIconActive]}><Ionicons color={active ? colors.ink : colors.muted} name={item.icon} size={20} /></View>
-              <Text numberOfLines={1} style={[styles.bottomLabel, active && styles.bottomLabelActive]}>{item.label === "Beneficiarios" ? "Benef." : item.label}</Text>
+              <Text numberOfLines={1} style={[styles.bottomLabel, active && styles.bottomLabelActive]}>{item.label === "Beneficiarios" ? "Destinos" : item.label}</Text>
             </Pressable>
           );
         })}
@@ -145,6 +145,6 @@ const styles = StyleSheet.create({
   bottomItem: { alignItems: "center", flex: 1, gap: 2, justifyContent: "center" },
   bottomIcon: { alignItems: "center", borderRadius: 15, height: 30, justifyContent: "center", width: 38 },
   bottomIconActive: { backgroundColor: colors.yellow },
-  bottomLabel: { color: colors.muted, fontFamily: fonts.bodyMedium, fontSize: 9 },
+  bottomLabel: { color: colors.muted, fontFamily: fonts.bodyMedium, fontSize: 10 },
   bottomLabelActive: { color: colors.ink },
 });
