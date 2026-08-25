@@ -14,6 +14,7 @@ export default function BeneficiariesScreen() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
+  const [focusedId, setFocusedId] = useState<string>();
 
   const load = useCallback(async () => {
     setLoading(true); setError(undefined);
@@ -30,7 +31,7 @@ export default function BeneficiariesScreen() {
       {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
       {!loading && !error && !filtered.length ? <EmptyState title="Sin resultados" message="No encontramos beneficiarios con ese nombre. Puedes cambiar la búsqueda o añadir uno nuevo." action={<Button label="Añadir beneficiario" onPress={() => router.push("/beneficiaries/new")} />} /> : null}
       {filtered.length ? <Card style={styles.list}>{filtered.map((item, index) => (
-        <Pressable accessibilityLabel={`Enviar dinero a ${item.name}`} accessibilityRole="button" key={item.id} onPress={() => router.push({ pathname: "/payments/new", params: { beneficiaryId: item.id } })} style={[styles.row, index > 0 && styles.rowBorder]}>
+        <Pressable accessibilityLabel={`Enviar dinero a ${item.name}`} accessibilityRole="button" key={item.id} onBlur={() => setFocusedId(undefined)} onFocus={() => setFocusedId(item.id)} onPress={() => router.push({ pathname: "/payments/new", params: { beneficiaryId: item.id } })} style={[styles.row, index > 0 && styles.rowBorder, focusedId === item.id && styles.rowFocused]}>
           <Avatar label={initials(item.name)} />
           <View style={styles.copy}><Text style={styles.name}>{item.name}</Text><Text style={styles.meta}>{item.country} · {item.bank} · {item.accountNumber}</Text></View>
           <Pill tone={item.status === "active" ? "success" : "warning"}>{item.status === "active" ? "Activo" : "Pendiente"}</Pill>
@@ -42,5 +43,5 @@ export default function BeneficiariesScreen() {
 }
 
 const styles = StyleSheet.create({
-  search: { alignItems: "flex-end", flexDirection: "row", gap: 10, maxWidth: 520 }, list: { padding: 0 }, row: { alignItems: "center", flexDirection: "row", gap: 13, minHeight: 78, paddingHorizontal: 17 }, rowBorder: { borderTopColor: colors.line, borderTopWidth: 1 }, copy: { flex: 1, gap: 5 }, name: { color: colors.ink, fontFamily: fonts.bodySemiBold, fontSize: 14 }, meta: { color: colors.muted, fontFamily: fonts.body, fontSize: 11 },
+  search: { alignItems: "flex-end", flexDirection: "row", gap: 10, maxWidth: 520 }, list: { padding: 0 }, row: { alignItems: "center", borderColor: "transparent", borderWidth: 2, flexDirection: "row", gap: 13, minHeight: 78, paddingHorizontal: 15 }, rowBorder: { borderTopColor: colors.line }, rowFocused: { borderColor: colors.ink }, copy: { flex: 1, gap: 5 }, name: { color: colors.ink, fontFamily: fonts.bodySemiBold, fontSize: 14 }, meta: { color: colors.muted, fontFamily: fonts.body, fontSize: 11 },
 });

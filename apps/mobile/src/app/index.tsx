@@ -27,11 +27,11 @@ export default function DashboardScreen() {
             </Card>
             <Card style={styles.metricCard}>
               <View style={styles.metricIcon}><Ionicons color={colors.green} name="arrow-down" size={18} /></View>
-              <Text style={styles.metricLabel}>Ingresos demo</Text><Text style={styles.metricValue}>{compactMoney(data.receivedThisMonth, "USD")}</Text>
+              <Text style={styles.metricLabel}>Ingresos demo</Text><Text style={styles.metricValue}>{compactMoney(data.demoReceivedUsd, "USD")}</Text>
             </Card>
             <Card style={styles.metricCard}>
               <View style={styles.metricIconDark}><Ionicons color={colors.paper} name="arrow-up" size={18} /></View>
-              <Text style={styles.metricLabel}>Pagos demo</Text><Text style={styles.metricValue}>{compactMoney(data.sentThisMonth, "USD")}</Text>
+              <Text style={styles.metricLabel}>Pagos demo</Text><Text style={styles.metricValue}>{compactMoney(data.demoSentUsd, "USD")}</Text>
             </Card>
           </View>
           <View style={[styles.mainGrid, !desktop && styles.mainGridMobile]}>

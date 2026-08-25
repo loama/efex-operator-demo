@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { useCallback } from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { AppShell } from "../components/app-shell";
-import { Button, Card, ErrorState, LoadingState, Pill, SectionTitle } from "../components/ui";
+import { Button, Card, EmptyState, ErrorState, LoadingState, Pill, SectionTitle } from "../components/ui";
 import { useApiResource } from "../hooks/use-api-resource";
 import { api } from "../lib/api";
 import { money } from "../lib/format";
@@ -17,7 +17,8 @@ export default function AccountsScreen() {
     <AppShell title="Cuentas" subtitle="Controla saldos globales desde un solo lugar." action={<Button label="Convertir divisas" onPress={() => router.push("/convert")} />}>
       {resource.loading ? <LoadingState /> : null}
       {resource.error ? <ErrorState message={resource.error} onRetry={() => void resource.reload()} /> : null}
-      {resource.data ? <>
+      {resource.data && !resource.data.accounts.length ? <EmptyState title="No hay cuentas disponibles" message="Las cuentas de la empresa aparecerán aquí cuando estén habilitadas." action={<Button label="Volver al inicio" onPress={() => router.push("/")} />} /> : null}
+      {resource.data?.accounts.length ? <>
         <View style={[styles.grid, !desktop && styles.gridMobile]}>
           {resource.data.accounts.map((account) => <Card key={account.id} style={styles.accountCard}>
             <View style={styles.accountTop}><View style={styles.currency}><Text style={styles.currencyText}>{account.currency}</Text></View><Pill tone="success">Activa</Pill></View>

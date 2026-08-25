@@ -10,7 +10,7 @@ const members = [
 ];
 
 export default function AccessScreen() {
-  const desktop = useWindowDimensions().width >= 720;
+  const desktop = useWindowDimensions().width >= 900;
   return (
     <AppShell title="Acceso de la empresa" subtitle="Consulta usuarios, aprobaciones y controles de la cuenta demo." action={<Button disabled label="Invitar usuario" onPress={() => undefined} />}>
       <Card style={styles.notice}>
