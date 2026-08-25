@@ -1,17 +1,12 @@
 import type { AssistantResponse, Beneficiary, CreateBeneficiaryInput, CreatePaymentInput, Dashboard, Payment, Quote, Statement } from "@efex/contracts";
 import { Platform } from "react-native";
+import { requestJson } from "./request";
 
 const defaultOrigin = Platform.OS === "android" ? "http://10.0.2.2:8787" : "http://127.0.0.1:8787";
 export const API_ORIGIN = process.env.EXPO_PUBLIC_API_URL ?? defaultOrigin;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_ORIGIN}${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
-  });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? "No fue posible completar la operación");
-  return body as T;
+  return requestJson<T>(API_ORIGIN, path, init);
 }
 
 export const api = {

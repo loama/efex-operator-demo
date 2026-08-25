@@ -16,17 +16,69 @@ const quoteQuerySchema = z.object({
   sourceAmount: z.coerce.number().positive().max(1_000_000),
 });
 
+export function resolveRequestLimit(value: string | undefined) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 10_000 ? parsed : 120;
+}
+
 export function createApp(database?: EfexDatabase) {
   const db = database ?? createDatabase();
   ensureSeeded(db);
   const service = createTreasuryService(db);
   const app = new Hono();
+  const configuredOrigins = new Set(
+    (process.env.WEB_ORIGIN ?? "")
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+  );
+  const requestLimit = resolveRequestLimit(process.env.DEMO_REQUEST_LIMIT);
+  const rateLimitWindowMs = 60_000;
+  const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
+  let lastRateLimitPrune = Date.now();
+
+  function consumeRateLimit(key: string, maximum: number, now: number) {
+    const current = rateLimitBuckets.get(key);
+    if (!current || current.resetAt <= now) {
+      rateLimitBuckets.set(key, { count: 1, resetAt: now + rateLimitWindowMs });
+      return true;
+    }
+    if (current.count >= maximum) return false;
+    current.count += 1;
+    return true;
+  }
 
   app.use("*", logger());
   app.use("/v1/*", cors({
-    origin: (origin) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ? origin : "",
+    origin: (origin) =>
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) || configuredOrigins.has(origin)
+        ? origin
+        : "",
     allowMethods: ["GET", "POST", "OPTIONS"],
   }));
+  app.use("/v1/*", async (context, next) => {
+    if (context.req.method === "OPTIONS") return next();
+    const now = Date.now();
+    if (now - lastRateLimitPrune >= rateLimitWindowMs) {
+      for (const [key, bucket] of rateLimitBuckets) {
+        if (bucket.resetAt <= now) rateLimitBuckets.delete(key);
+      }
+      lastRateLimitPrune = now;
+    }
+    const forwarded = context.req.header("x-forwarded-for")
+      ?.split(",")
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .at(-1);
+    const clientKey = `client:${forwarded ?? "local"}`;
+    const allowedForClient = consumeRateLimit(clientKey, requestLimit, now);
+    const allowedGlobally = allowedForClient ? consumeRateLimit("global", requestLimit * 10, now) : true;
+    if (!allowedForClient || !allowedGlobally) {
+      context.header("Retry-After", "60");
+      return context.json({ error: "El servicio demo recibió demasiadas solicitudes. Intenta de nuevo en un minuto." }, 429);
+    }
+    await next();
+  });
 
   app.get("/health", (context) => context.json({ ok: true, service: "efex-demo-api" }));
   app.get("/v1/dashboard", (context) => context.json(service.dashboard()));
@@ -100,7 +152,7 @@ export function createApp(database?: EfexDatabase) {
   });
   app.post("/v1/demo/reset", (context) => {
     const hostname = new URL(context.req.url).hostname;
-    if (!["localhost", "127.0.0.1"].includes(hostname) && process.env.ENABLE_DEMO_RESET !== "true") {
+    if (!["localhost", "127.0.0.1"].includes(hostname)) {
       return context.json({ error: "Demo reset is disabled on this host" }, 403);
     }
     seedDatabase(db);

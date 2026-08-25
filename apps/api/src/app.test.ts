@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createHmac } from "node:crypto";
-import { createApp } from "./app";
+import { createApp, resolveRequestLimit } from "./app";
 import { createDatabase, seedDatabase, type EfexDatabase } from "./database";
 import { answerKapsoWebhook } from "./kapso";
 import { createTreasuryService } from "./service";
@@ -10,6 +10,8 @@ let app: ReturnType<typeof createApp>["app"];
 const originalWebhookSecret = process.env.KAPSO_WEBHOOK_SECRET;
 const originalPhoneNumberId = process.env.KAPSO_PHONE_NUMBER_ID;
 const originalPublicApiOrigin = process.env.PUBLIC_API_ORIGIN;
+const originalWebOrigin = process.env.WEB_ORIGIN;
+const originalRequestLimit = process.env.DEMO_REQUEST_LIMIT;
 
 beforeEach(() => {
   db = createDatabase(":memory:");
@@ -24,16 +26,54 @@ afterEach(() => {
   else delete process.env.KAPSO_PHONE_NUMBER_ID;
   if (originalPublicApiOrigin) process.env.PUBLIC_API_ORIGIN = originalPublicApiOrigin;
   else delete process.env.PUBLIC_API_ORIGIN;
+  if (originalWebOrigin) process.env.WEB_ORIGIN = originalWebOrigin;
+  else delete process.env.WEB_ORIGIN;
+  if (originalRequestLimit) process.env.DEMO_REQUEST_LIMIT = originalRequestLimit;
+  else delete process.env.DEMO_REQUEST_LIMIT;
   db.close();
 });
 
 describe("EFEX demo API", () => {
+  test("uses a safe request limit when configuration is invalid", () => {
+    expect(resolveRequestLimit(undefined)).toBe(120);
+    expect(resolveRequestLimit("not a number")).toBe(120);
+    expect(resolveRequestLimit("0")).toBe(120);
+    expect(resolveRequestLimit("10001")).toBe(120);
+    expect(resolveRequestLimit("240")).toBe(240);
+  });
+
+  test("allows the configured production web origin", async () => {
+    const webOrigin = "https://efex-operator-demo-loama.onrender.com";
+    process.env.WEB_ORIGIN = webOrigin;
+    app = createApp(db).app;
+    const response = await app.request("/v1/dashboard", {
+      method: "OPTIONS",
+      headers: {
+        Origin: webOrigin,
+        "Access-Control-Request-Method": "GET",
+      },
+    });
+    expect(response.status).toBe(204);
+    expect(response.headers.get("access-control-allow-origin")).toBe(webOrigin);
+  });
+
   test("returns a seeded dashboard", async () => {
     const response = await app.request("/v1/dashboard");
     const body = await response.json();
     expect(response.status).toBe(200);
     expect(body.company.name).toBe("Asteria Imports");
     expect(body.accounts).toHaveLength(2);
+  });
+
+  test("limits public API requests by client", async () => {
+    process.env.DEMO_REQUEST_LIMIT = "2";
+    app = createApp(db).app;
+    const headers = { "X-Forwarded-For": "203.0.113.10" };
+    expect((await app.request("/v1/dashboard", { headers })).status).toBe(200);
+    expect((await app.request("/v1/dashboard", { headers })).status).toBe(200);
+    const limited = await app.request("/v1/dashboard", { headers });
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toBe("60");
   });
 
   test("creates a beneficiary and persists it", async () => {
@@ -208,7 +248,7 @@ describe("EFEX demo API", () => {
     expect((await request(JSON.stringify({ type: "whatsapp.message.received", data: {} }))).status).toBe(400);
   });
 
-  test("blocks public demo reset unless explicitly enabled", async () => {
+  test("blocks public demo reset", async () => {
     const response = await app.request("https://demo.example/v1/demo/reset", { method: "POST" });
     expect(response.status).toBe(403);
   });
