@@ -135,8 +135,8 @@ export function createTreasuryService(db: EfexDatabase) {
     return {
       company: { name: "Asteria Imports", contactName: "Santiago Bustamante" },
       totalUsd: Number(accounts.reduce((total, account) => total + toUsd(account.balance, account.currency), 0).toFixed(2)),
-      receivedThisMonth: Number(activity.filter((item) => item.direction === "in").reduce((total, item) => total + toUsd(item.amount, item.currency), 0).toFixed(2)),
-      sentThisMonth: Number(payments.reduce((total, payment) => total + toUsd(payment.sourceAmount, payment.sourceCurrency), 0).toFixed(2)),
+      demoReceivedUsd: Number(activity.filter((item) => item.direction === "in").reduce((total, item) => total + toUsd(item.amount, item.currency), 0).toFixed(2)),
+      demoSentUsd: Number(payments.reduce((total, payment) => total + toUsd(payment.sourceAmount, payment.sourceCurrency), 0).toFixed(2)),
       accounts,
       activity,
     };
@@ -219,13 +219,16 @@ export function createTreasuryService(db: EfexDatabase) {
   }
 
   function statements(): Statement[] {
-    return ["Mayo", "Abril", "Marzo"].map((month, index) => ({
-      id: `statement_${index + 1}`,
-      month,
+    return [
+      { id: "statement_1", month: "Mayo", openingBalance: 850000, incoming: 150000, outgoing: 48900, closingBalance: 951100 },
+      { id: "statement_2", month: "Abril", openingBalance: 790000, incoming: 112500, outgoing: 52500, closingBalance: 850000 },
+      { id: "statement_3", month: "Marzo", openingBalance: 740000, incoming: 90000, outgoing: 40000, closingBalance: 790000 },
+    ].map((statement) => ({
+      ...statement,
       year: 2026,
       accountId: "account_usd",
-      status: "available",
-      downloadUrl: `/v1/statements/statement_${index + 1}/download`,
+      status: "available" as const,
+      downloadUrl: `/v1/statements/${statement.id}/download`,
     }));
   }
 
@@ -271,19 +274,45 @@ export function createTreasuryService(db: EfexDatabase) {
     };
   }
 
-  function claimKapsoMessage(messageId: string): boolean {
-    const result = db.prepare("INSERT INTO kapso_messages VALUES ($messageId, $createdAt) ON CONFLICT(message_id) DO NOTHING").run({
+  const claimKapsoMessageTransaction = db.transaction((messageId: string) => {
+    const now = new Date().toISOString();
+    const inserted = db.prepare(
+      "INSERT INTO kapso_deliveries VALUES ($messageId, 'processing', 0, 0, $createdAt, $updatedAt) ON CONFLICT(message_id) DO NOTHING",
+    ).run({ $messageId: messageId, $createdAt: now, $updatedAt: now });
+    if (inserted.changes === 1) return { claimed: true, textSent: false, documentSent: false };
+
+    const existing = db.query<{ status: string; text_sent: number; document_sent: number }, string>(
+      "SELECT status, text_sent, document_sent FROM kapso_deliveries WHERE message_id = ?",
+    ).get(messageId);
+    if (existing?.status !== "failed") return { claimed: false, textSent: Boolean(existing?.text_sent), documentSent: Boolean(existing?.document_sent) };
+    const resumed = db.prepare("UPDATE kapso_deliveries SET status = 'processing', updated_at = $updatedAt WHERE message_id = $messageId AND status = 'failed'").run({
       $messageId: messageId,
-      $createdAt: new Date().toISOString(),
+      $updatedAt: now,
     });
-    return result.changes === 1;
+    return { claimed: resumed.changes === 1, textSent: Boolean(existing.text_sent), documentSent: Boolean(existing.document_sent) };
+  });
+
+  function claimKapsoMessage(messageId: string) {
+    return claimKapsoMessageTransaction(messageId);
   }
 
-  function releaseKapsoMessage(messageId: string) {
-    db.prepare("DELETE FROM kapso_messages WHERE message_id = ?").run(messageId);
+  function markKapsoTextSent(messageId: string) {
+    db.prepare("UPDATE kapso_deliveries SET text_sent = 1, updated_at = $updatedAt WHERE message_id = $messageId").run({ $messageId: messageId, $updatedAt: new Date().toISOString() });
   }
 
-  return { assistant, claimKapsoMessage, createBeneficiary, createPayment, dashboard, listBeneficiaries, listPayments, quote, releaseKapsoMessage, statements, submitPayment };
+  function markKapsoDocumentSent(messageId: string) {
+    db.prepare("UPDATE kapso_deliveries SET document_sent = 1, updated_at = $updatedAt WHERE message_id = $messageId").run({ $messageId: messageId, $updatedAt: new Date().toISOString() });
+  }
+
+  function completeKapsoMessage(messageId: string) {
+    db.prepare("UPDATE kapso_deliveries SET status = 'complete', updated_at = $updatedAt WHERE message_id = $messageId").run({ $messageId: messageId, $updatedAt: new Date().toISOString() });
+  }
+
+  function failKapsoMessage(messageId: string) {
+    db.prepare("UPDATE kapso_deliveries SET status = 'failed', updated_at = $updatedAt WHERE message_id = $messageId").run({ $messageId: messageId, $updatedAt: new Date().toISOString() });
+  }
+
+  return { assistant, claimKapsoMessage, completeKapsoMessage, createBeneficiary, createPayment, dashboard, failKapsoMessage, listBeneficiaries, listPayments, markKapsoDocumentSent, markKapsoTextSent, quote, statements, submitPayment };
 }
 
 export type TreasuryService = ReturnType<typeof createTreasuryService>;

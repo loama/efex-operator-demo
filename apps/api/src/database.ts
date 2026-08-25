@@ -39,9 +39,13 @@ export function createDatabase(path = process.env.DATABASE_PATH ?? "efex-demo.sq
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
-    CREATE TABLE IF NOT EXISTS kapso_messages (
+    CREATE TABLE IF NOT EXISTS kapso_deliveries (
       message_id TEXT PRIMARY KEY,
-      created_at TEXT NOT NULL
+      status TEXT NOT NULL,
+      text_sent INTEGER NOT NULL DEFAULT 0,
+      document_sent INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
     );
   `);
 
@@ -52,7 +56,7 @@ export type EfexDatabase = ReturnType<typeof createDatabase>;
 
 export function seedDatabase(db: EfexDatabase) {
   const seed = db.transaction(() => {
-    db.exec("DELETE FROM kapso_messages; DELETE FROM payments; DELETE FROM beneficiaries; DELETE FROM accounts;");
+    db.exec("DELETE FROM kapso_deliveries; DELETE FROM payments; DELETE FROM beneficiaries; DELETE FROM accounts;");
 
     const account = db.prepare(
       "INSERT INTO accounts VALUES ($id, $currency, $name, $balance, $available, $accountNumber)",

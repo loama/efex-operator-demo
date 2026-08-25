@@ -2,6 +2,7 @@ import { createBeneficiarySchema, createPaymentSchema, assistantRequestSchema, c
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
 import { z, ZodError } from "zod";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
@@ -63,10 +64,10 @@ export function createApp(database?: EfexDatabase) {
     page.drawText("Estado de cuenta sintetico", { x: 52, y: 650, font: bold, size: 18 });
     page.drawText(`${statement.month} ${statement.year}`, { x: 52, y: 620, font: regular, size: 13 });
     page.drawText("Cuenta global USD", { x: 52, y: 575, font: bold, size: 12 });
-    const summary = service.dashboard();
-    page.drawText(`Saldo consolidado USD ${summary.totalUsd.toFixed(2)}`, { x: 52, y: 545, font: regular, size: 11 });
-    page.drawText(`Entradas demo     USD ${summary.receivedThisMonth.toFixed(2)}`, { x: 52, y: 520, font: regular, size: 11 });
-    page.drawText(`Salidas demo      USD ${summary.sentThisMonth.toFixed(2)}`, { x: 52, y: 495, font: regular, size: 11 });
+    page.drawText(`Saldo inicial     USD ${statement.openingBalance.toFixed(2)}`, { x: 52, y: 545, font: regular, size: 11 });
+    page.drawText(`Entradas demo     USD ${statement.incoming.toFixed(2)}`, { x: 52, y: 520, font: regular, size: 11 });
+    page.drawText(`Salidas demo      USD ${statement.outgoing.toFixed(2)}`, { x: 52, y: 495, font: regular, size: 11 });
+    page.drawText(`Saldo final       USD ${statement.closingBalance.toFixed(2)}`, { x: 52, y: 470, font: bold, size: 11 });
     page.drawText("Este documento usa datos sinteticos y no representa fondos reales.", { x: 52, y: 90, font: regular, size: 10, color: rgb(0.4, 0.4, 0.4) });
     const bytes = await document.save();
     context.header("Content-Disposition", `attachment; filename=efex-demo-${statement.id}.pdf`);
@@ -107,6 +108,7 @@ export function createApp(database?: EfexDatabase) {
   });
 
   app.onError((error, context) => {
+    if (error instanceof HTTPException) return context.json({ error: error.message || "Invalid request" }, error.status);
     console.error(error);
     return context.json({ error: "Unexpected demo service error" }, 500);
   });

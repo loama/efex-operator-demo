@@ -34,7 +34,12 @@ export function parseKapsoMessages(payload: unknown) {
   return [parsed];
 }
 
-export async function answerKapsoWebhook(service: TreasuryService, payload: unknown) {
+type DeliveryClient = {
+  sendText: (input: { phoneNumberId: string; to: string; body: string; previewUrl: boolean }) => Promise<unknown>;
+  sendDocument: (input: { phoneNumberId: string; to: string; document: { link: string; filename: string; caption: string } }) => Promise<unknown>;
+};
+
+export async function answerKapsoWebhook(service: TreasuryService, payload: unknown, deliveryClient?: DeliveryClient) {
   const events = parseKapsoMessages(payload);
   const answers = [];
   for (const event of events) {
@@ -47,7 +52,8 @@ export async function answerKapsoWebhook(service: TreasuryService, payload: unkn
       answers.push({ messageId: event.message.id, rejected: true, delivered: false });
       continue;
     }
-    if (!service.claimKapsoMessage(event.message.id)) {
+    const claim = service.claimKapsoMessage(event.message.id);
+    if (!claim.claimed) {
       answers.push({ messageId: event.message.id, duplicate: true, delivered: false });
       continue;
     }
@@ -55,12 +61,18 @@ export async function answerKapsoWebhook(service: TreasuryService, payload: unkn
     const suffix = response.action ? `\n\n${response.action.label}: ${response.action.route}` : "";
 
     try {
-      if (process.env.KAPSO_API_KEY && phoneNumberId && to) {
-        const { WhatsAppClient } = await import("@kapso/whatsapp-cloud-api");
-        const client = new WhatsAppClient({ baseUrl: "https://app.kapso.ai/api/meta/", kapsoApiKey: process.env.KAPSO_API_KEY });
-        await client.messages.sendText({ phoneNumberId, to, body: `${response.text}${suffix}`, previewUrl: false });
-        if (response.attachment && process.env.PUBLIC_API_ORIGIN) {
-          await client.messages.sendDocument({
+      if ((deliveryClient || process.env.KAPSO_API_KEY) && phoneNumberId && to) {
+        let client = deliveryClient;
+        if (!client) {
+          const { WhatsAppClient } = await import("@kapso/whatsapp-cloud-api");
+          client = new WhatsAppClient({ baseUrl: "https://app.kapso.ai/api/meta/", kapsoApiKey: process.env.KAPSO_API_KEY! }).messages;
+        }
+        if (!claim.textSent) {
+          await client.sendText({ phoneNumberId, to, body: `${response.text}${suffix}`, previewUrl: false });
+          service.markKapsoTextSent(event.message.id);
+        }
+        if (response.attachment && process.env.PUBLIC_API_ORIGIN && !claim.documentSent) {
+          await client.sendDocument({
             phoneNumberId,
             to,
             document: {
@@ -69,13 +81,15 @@ export async function answerKapsoWebhook(service: TreasuryService, payload: unkn
               caption: response.attachment.label,
             },
           });
+          service.markKapsoDocumentSent(event.message.id);
         }
       }
+      service.completeKapsoMessage(event.message.id);
     } catch (error) {
-      service.releaseKapsoMessage(event.message.id);
+      service.failKapsoMessage(event.message.id);
       throw error;
     }
-    answers.push({ messageId: event.message.id, response, delivered: Boolean(process.env.KAPSO_API_KEY && phoneNumberId && to) });
+    answers.push({ messageId: event.message.id, response, delivered: Boolean((deliveryClient || process.env.KAPSO_API_KEY) && phoneNumberId && to) });
   }
   return answers;
 }

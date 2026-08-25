@@ -93,14 +93,18 @@ export const statementSchema = z.object({
   accountId: z.string(),
   status: z.literal("available"),
   downloadUrl: z.string(),
+  openingBalance: z.number(),
+  incoming: z.number(),
+  outgoing: z.number(),
+  closingBalance: z.number(),
 });
 export type Statement = z.infer<typeof statementSchema>;
 
 export const dashboardSchema = z.object({
   company: z.object({ name: z.string(), contactName: z.string() }),
   totalUsd: z.number(),
-  receivedThisMonth: z.number(),
-  sentThisMonth: z.number(),
+  demoReceivedUsd: z.number(),
+  demoSentUsd: z.number(),
   accounts: z.array(accountSchema),
   activity: z.array(activitySchema),
 });

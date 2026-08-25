@@ -8,6 +8,8 @@ import { createTreasuryService } from "./service";
 let db: EfexDatabase;
 let app: ReturnType<typeof createApp>["app"];
 const originalWebhookSecret = process.env.KAPSO_WEBHOOK_SECRET;
+const originalPhoneNumberId = process.env.KAPSO_PHONE_NUMBER_ID;
+const originalPublicApiOrigin = process.env.PUBLIC_API_ORIGIN;
 
 beforeEach(() => {
   db = createDatabase(":memory:");
@@ -18,6 +20,10 @@ beforeEach(() => {
 afterEach(() => {
   if (originalWebhookSecret) process.env.KAPSO_WEBHOOK_SECRET = originalWebhookSecret;
   else delete process.env.KAPSO_WEBHOOK_SECRET;
+  if (originalPhoneNumberId) process.env.KAPSO_PHONE_NUMBER_ID = originalPhoneNumberId;
+  else delete process.env.KAPSO_PHONE_NUMBER_ID;
+  if (originalPublicApiOrigin) process.env.PUBLIC_API_ORIGIN = originalPublicApiOrigin;
+  else delete process.env.PUBLIC_API_ORIGIN;
   db.close();
 });
 
@@ -77,6 +83,16 @@ describe("EFEX demo API", () => {
       body: JSON.stringify({ beneficiaryId: "beneficiary_frutella", sourceAmount: 0 }),
     });
     expect(response.status).toBe(400);
+  });
+
+  test("returns a client error for malformed JSON", async () => {
+    const response = await app.request("/v1/payments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "not json",
+    });
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBeString();
   });
 
   test("rejects a destination currency that conflicts with the beneficiary", async () => {
@@ -153,6 +169,27 @@ describe("EFEX demo API", () => {
     const restartedService = createTreasuryService(db);
     const repeated = await answerKapsoWebhook(restartedService, payload);
     expect(repeated[0]?.duplicate).toBe(true);
+  });
+
+  test("resumes a Kapso document retry without resending text", async () => {
+    process.env.KAPSO_PHONE_NUMBER_ID = "demo_number";
+    process.env.PUBLIC_API_ORIGIN = "https://demo.example";
+    const service = createTreasuryService(db);
+    const payload = {
+      message: { id: "wamid.document", type: "text", text: { body: "Necesito mi estado de cuenta" }, kapso: { phone_number: "5215550100", phone_number_id: "demo_number" } },
+      phone_number_id: "demo_number",
+    };
+    let textSends = 0;
+    let documentSends = 0;
+    const delivery = {
+      sendText: async () => { textSends += 1; },
+      sendDocument: async () => { documentSends += 1; if (documentSends === 1) throw new Error("Document transport failed"); },
+    };
+    await expect(answerKapsoWebhook(service, payload, delivery)).rejects.toThrow("Document transport failed");
+    const retried = await answerKapsoWebhook(service, payload, delivery);
+    expect(retried[0]?.delivered).toBe(true);
+    expect(textSends).toBe(1);
+    expect(documentSends).toBe(2);
   });
 
   test("rejects signed malformed Kapso payloads", async () => {
