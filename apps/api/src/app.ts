@@ -6,7 +6,7 @@ import { logger } from "hono/logger";
 import { z } from "zod";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { createDatabase, ensureSeeded, seedDatabase, type EfexDatabase } from "./database";
-import { createTreasuryService } from "./service";
+import { createTreasuryService, TreasuryValidationError } from "./service";
 import { answerKapsoWebhook, verifyKapsoSignature } from "./kapso";
 
 const quoteQuerySchema = z.object({
@@ -22,7 +22,10 @@ export function createApp(database?: EfexDatabase) {
   const app = new Hono();
 
   app.use("*", logger());
-  app.use("/v1/*", cors({ origin: "*", allowMethods: ["GET", "POST", "OPTIONS"] }));
+  app.use("/v1/*", cors({
+    origin: (origin) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ? origin : "",
+    allowMethods: ["GET", "POST", "OPTIONS"],
+  }));
 
   app.get("/health", (context) => context.json({ ok: true, service: "efex-demo-api" }));
   app.get("/v1/dashboard", (context) => context.json(service.dashboard()));
@@ -35,7 +38,8 @@ export function createApp(database?: EfexDatabase) {
     try {
       return context.json(service.createPayment(context.req.valid("json")), 201);
     } catch (error) {
-      return context.json({ error: error instanceof Error ? error.message : "Unable to create payment" }, 404);
+      const status = error instanceof TreasuryValidationError ? 422 : 404;
+      return context.json({ error: error instanceof Error ? error.message : "Unable to create payment" }, status);
     }
   });
   app.post("/v1/payments/:id/submit", (context) => {
@@ -59,9 +63,10 @@ export function createApp(database?: EfexDatabase) {
     page.drawText("Estado de cuenta sintetico", { x: 52, y: 650, font: bold, size: 18 });
     page.drawText(`${statement.month} ${statement.year}`, { x: 52, y: 620, font: regular, size: 13 });
     page.drawText("Cuenta global USD", { x: 52, y: 575, font: bold, size: 12 });
-    page.drawText("Saldo inicial     USD 850,000.00", { x: 52, y: 545, font: regular, size: 11 });
-    page.drawText("Entradas          USD 350,000.00", { x: 52, y: 520, font: regular, size: 11 });
-    page.drawText("Salidas           USD 73,900.00", { x: 52, y: 495, font: regular, size: 11 });
+    const summary = service.dashboard();
+    page.drawText(`Saldo consolidado USD ${summary.totalUsd.toFixed(2)}`, { x: 52, y: 545, font: regular, size: 11 });
+    page.drawText(`Entradas demo     USD ${summary.receivedThisMonth.toFixed(2)}`, { x: 52, y: 520, font: regular, size: 11 });
+    page.drawText(`Salidas demo      USD ${summary.sentThisMonth.toFixed(2)}`, { x: 52, y: 495, font: regular, size: 11 });
     page.drawText("Este documento usa datos sinteticos y no representa fondos reales.", { x: 52, y: 90, font: regular, size: 10, color: rgb(0.4, 0.4, 0.4) });
     const bytes = await document.save();
     context.header("Content-Disposition", `attachment; filename=efex-demo-${statement.id}.pdf`);
@@ -79,10 +84,16 @@ export function createApp(database?: EfexDatabase) {
     if (!verifyKapsoSignature(rawBody, context.req.header("x-webhook-signature"), process.env.KAPSO_WEBHOOK_SECRET)) {
       return context.json({ error: "Invalid webhook signature" }, 401);
     }
+    const eventType = context.req.header("x-webhook-event") ?? JSON.parse(rawBody).type;
+    if (eventType !== "whatsapp.message.received") return context.json({ ok: true, processed: 0 });
     const answers = await answerKapsoWebhook(service, JSON.parse(rawBody));
     return context.json({ ok: true, processed: answers.length });
   });
   app.post("/v1/demo/reset", (context) => {
+    const hostname = new URL(context.req.url).hostname;
+    if (!["localhost", "127.0.0.1"].includes(hostname) && process.env.ENABLE_DEMO_RESET !== "true") {
+      return context.json({ error: "Demo reset is disabled on this host" }, 403);
+    }
     seedDatabase(db);
     return context.json({ ok: true });
   });

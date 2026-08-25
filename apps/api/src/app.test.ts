@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createApp } from "./app";
 import { createDatabase, seedDatabase, type EfexDatabase } from "./database";
+import { answerKapsoWebhook, resetKapsoIdempotencyForTests } from "./kapso";
 
 let db: EfexDatabase;
 let app: ReturnType<typeof createApp>["app"];
 
 beforeEach(() => {
+  resetKapsoIdempotencyForTests();
   db = createDatabase(":memory:");
   seedDatabase(db);
   app = createApp(db).app;
@@ -71,6 +73,24 @@ describe("EFEX demo API", () => {
     expect(response.status).toBe(400);
   });
 
+  test("rejects a destination currency that conflicts with the beneficiary", async () => {
+    const response = await app.request("/v1/payments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ beneficiaryId: "beneficiary_global_foods", sourceCurrency: "USD", destinationCurrency: "MXN", sourceAmount: 100, reference: "Currency check" }),
+    });
+    expect(response.status).toBe(422);
+  });
+
+  test("rejects a payment over the available demo balance", async () => {
+    const response = await app.request("/v1/payments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ beneficiaryId: "beneficiary_frutella", sourceCurrency: "USD", destinationCurrency: "MXN", sourceAmount: 900000, reference: "Funds check" }),
+    });
+    expect(response.status).toBe(422);
+  });
+
   test("answers assistant questions with app actions", async () => {
     const response = await app.request("/v1/assistant", {
       method: "POST",
@@ -101,6 +121,20 @@ describe("EFEX demo API", () => {
       body: JSON.stringify({ type: "whatsapp.message.received", data: {} }),
     });
     expect(response.status).toBe(401);
+  });
+
+  test("deduplicates repeated Kapso messages", async () => {
+    const service = createApp(db).service;
+    const payload = { message: { id: "wamid.100", type: "text", text: { body: "saldo" } }, phone_number_id: "demo_number" };
+    const first = await answerKapsoWebhook(service, payload);
+    const second = await answerKapsoWebhook(service, payload);
+    expect(first[0]?.duplicate).toBeUndefined();
+    expect(second[0]?.duplicate).toBe(true);
+  });
+
+  test("blocks public demo reset unless explicitly enabled", async () => {
+    const response = await app.request("https://demo.example/v1/demo/reset", { method: "POST" });
+    expect(response.status).toBe(403);
   });
 
   test("downloads a valid synthetic PDF statement", async () => {

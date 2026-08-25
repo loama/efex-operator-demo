@@ -20,6 +20,8 @@ const webhookSchema = z.union([
   z.object({ type: z.string().optional(), data: z.union([eventDataSchema, z.array(eventDataSchema)]), batch: z.boolean().optional() }).passthrough(),
 ]);
 
+const processedMessageIds = new Set<string>();
+
 export function verifyKapsoSignature(rawBody: string, signature: string | undefined, secret: string | undefined) {
   if (!signature || !secret) return false;
   const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
@@ -38,11 +40,20 @@ export async function answerKapsoWebhook(service: TreasuryService, payload: unkn
   const events = parseKapsoMessages(payload);
   const answers = [];
   for (const event of events) {
+    if (processedMessageIds.has(event.message.id)) {
+      answers.push({ messageId: event.message.id, duplicate: true, delivered: false });
+      continue;
+    }
     const text = event.message.text?.body;
     if (!text) continue;
     const response = service.assistant(text);
     const to = event.message.kapso?.phone_number ?? event.conversation?.phone_number;
-    const phoneNumberId = event.phone_number_id ?? event.message.kapso?.phone_number_id ?? process.env.KAPSO_PHONE_NUMBER_ID;
+    const eventPhoneNumberId = event.phone_number_id ?? event.message.kapso?.phone_number_id;
+    const phoneNumberId = process.env.KAPSO_PHONE_NUMBER_ID;
+    if (phoneNumberId && eventPhoneNumberId && phoneNumberId !== eventPhoneNumberId) {
+      answers.push({ messageId: event.message.id, rejected: true, delivered: false });
+      continue;
+    }
     const suffix = response.action ? `\n\n${response.action.label}: ${response.action.route}` : "";
 
     if (process.env.KAPSO_API_KEY && phoneNumberId && to) {
@@ -61,7 +72,12 @@ export async function answerKapsoWebhook(service: TreasuryService, payload: unkn
         });
       }
     }
+    processedMessageIds.add(event.message.id);
     answers.push({ messageId: event.message.id, response, delivered: Boolean(process.env.KAPSO_API_KEY && phoneNumberId && to) });
   }
   return answers;
+}
+
+export function resetKapsoIdempotencyForTests() {
+  processedMessageIds.clear();
 }

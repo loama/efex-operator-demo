@@ -46,6 +46,8 @@ type PaymentRow = {
   updated_at: string;
 };
 
+export class TreasuryValidationError extends Error {}
+
 const accountFromRow = (row: AccountRow) => ({
   id: row.id,
   currency: row.currency,
@@ -129,11 +131,12 @@ export function createTreasuryService(db: EfexDatabase) {
         createdAt: payment.createdAt,
       })),
     ];
+    const toUsd = (amount: number, currency: "USD" | "MXN") => currency === "USD" ? amount : amount / 17.12;
     return {
       company: { name: "Asteria Imports", contactName: "Santiago Bustamante" },
-      totalUsd: 938682.75,
-      receivedThisMonth: 350000,
-      sentThisMonth: payments.reduce((total, payment) => total + payment.sourceAmount, 0),
+      totalUsd: Number(accounts.reduce((total, account) => total + toUsd(account.balance, account.currency), 0).toFixed(2)),
+      receivedThisMonth: Number(activity.filter((item) => item.direction === "in").reduce((total, item) => total + toUsd(item.amount, item.currency), 0).toFixed(2)),
+      sentThisMonth: Number(payments.reduce((total, payment) => total + toUsd(payment.sourceAmount, payment.sourceCurrency), 0).toFixed(2)),
       accounts,
       activity,
     };
@@ -174,6 +177,9 @@ export function createTreasuryService(db: EfexDatabase) {
   function createPayment(input: CreatePaymentInput): Payment {
     const beneficiary = listBeneficiaries().find((item) => item.id === input.beneficiaryId);
     if (!beneficiary) throw new Error("Beneficiary not found");
+    if (beneficiary.currency !== input.destinationCurrency) throw new TreasuryValidationError("Destination currency must match beneficiary currency");
+    const account = db.query<AccountRow, string>("SELECT * FROM accounts WHERE currency = ?").get(input.sourceCurrency);
+    if (!account || input.sourceAmount > account.available) throw new TreasuryValidationError("Insufficient demo funds");
     const priced = quote(input.sourceCurrency, input.destinationCurrency, input.sourceAmount);
     const id = `payment_${crypto.randomUUID()}`;
     const createdAt = new Date().toISOString();
