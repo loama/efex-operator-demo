@@ -1,0 +1,23 @@
+{
+  "name": "efex-operator-demo",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "bun@1.3.13",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "bun --cwd apps/api run dev",
+    "dev:app": "bun --cwd apps/mobile run start",
+    "ios": "bun --cwd apps/mobile run ios",
+    "web": "bun --cwd apps/mobile run web",
+    "test:api": "bun --cwd apps/api run test",
+    "test:contracts": "bun --cwd packages/contracts run test",
+    "test:mobile": "bun --cwd apps/mobile run test",
+    "test": "bun run test:contracts && bun run test:api && bun run test:mobile",
+    "typecheck": "bun --cwd packages/contracts run typecheck && bun --cwd apps/api run typecheck && bun --cwd apps/mobile run typecheck",
+    "lint": "bun --cwd apps/mobile run lint",
+    "build:web": "bun --cwd apps/mobile run build:web"
+  }
+}
