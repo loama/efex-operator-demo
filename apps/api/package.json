@@ -1,0 +1,24 @@
+{
+  "name": "@efex/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/server.ts",
+    "start": "bun src/server.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@efex/contracts": "workspace:*",
+    "@kapso/whatsapp-cloud-api": "latest",
+    "@hono/zod-validator": "^0.7.2",
+    "hono": "^4.9.6",
+    "pdf-lib": "^1.17.1",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "~6.0.3"
+  }
+}

@@ -14,3 +14,9 @@ coverage/
 ios/
 android/
 .superpowers/
+apps/mobile/assets/images/expo-badge*.png
+apps/mobile/assets/images/expo-logo.png
+apps/mobile/assets/images/logo-glow.png
+apps/mobile/assets/images/react-logo*.png
+apps/mobile/assets/images/tutorial-web.png
+apps/mobile/assets/images/tabIcons/

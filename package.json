@@ -8,16 +8,16 @@
     "packages/*"
   ],
   "scripts": {
-    "dev:api": "bun --cwd apps/api run dev",
-    "dev:app": "bun --cwd apps/mobile run start",
-    "ios": "bun --cwd apps/mobile run ios",
-    "web": "bun --cwd apps/mobile run web",
-    "test:api": "bun --cwd apps/api run test",
-    "test:contracts": "bun --cwd packages/contracts run test",
-    "test:mobile": "bun --cwd apps/mobile run test",
+    "dev:api": "bun run --cwd apps/api dev",
+    "dev:app": "bun run --cwd apps/mobile start",
+    "ios": "bun run --cwd apps/mobile ios",
+    "web": "bun run --cwd apps/mobile web",
+    "test:api": "bun run --cwd apps/api test",
+    "test:contracts": "bun run --cwd packages/contracts test",
+    "test:mobile": "bun run --cwd apps/mobile test",
     "test": "bun run test:contracts && bun run test:api && bun run test:mobile",
-    "typecheck": "bun --cwd packages/contracts run typecheck && bun --cwd apps/api run typecheck && bun --cwd apps/mobile run typecheck",
-    "lint": "bun --cwd apps/mobile run lint",
-    "build:web": "bun --cwd apps/mobile run build:web"
+    "typecheck": "bun run --cwd packages/contracts typecheck && bun run --cwd apps/api typecheck && bun run --cwd apps/mobile typecheck",
+    "lint": "bun run --cwd apps/mobile lint",
+    "build:web": "bun run --cwd apps/mobile build:web"
   }
 }
