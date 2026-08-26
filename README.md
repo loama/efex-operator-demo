@@ -82,9 +82,9 @@ Without credentials, use `POST /v1/whatsapp/simulate` with `{ "message": "Necesi
 
 Kapso setup follows the official [TypeScript SDK guide](https://docs.kapso.ai/docs/whatsapp/typescript-sdk/introduction) and [webhook guide](https://docs.kapso.ai/docs/platform/webhooks/overview).
 
-## OpenAI setup
+## Azure OpenAI setup
 
-Set `OPENAI_API_KEY` on the API service to enable model routing. `OPENAI_MODEL` defaults to `gpt-5.6-terra`. The model sees the customer question, selects exactly one typed read function, and suggests filters for a requested payment, beneficiary, statement period, or conversion amount. It never receives account records. The server reconciles explicit names, identifiers, periods, currencies, and amounts from the original message before it executes the function. It then constructs the final answer, status, navigation route, and statement attachment from validated synthetic data. If the model request fails or the key is absent, the existing deterministic assistant responds instead.
+Set `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_BASE_URL`, and `AZURE_OPENAI_MODEL` on the API service to enable model routing through Microsoft Foundry. The model sees the customer question and selects one typed read function. It never receives account records. The server reconciles explicit names, identifiers, periods, currencies, and amounts from the original message before it runs the function. It then builds the final answer, status, navigation route, and statement attachment from validated synthetic data. If the model request fails or the Azure configuration is absent, the deterministic assistant responds instead.
 
 The assistant can explain synthetic account data, while the model only selects the relevant read function. It cannot execute payments or modify beneficiaries. Those operations remain explicit app flows with their existing validation and confirmation screens.
 
