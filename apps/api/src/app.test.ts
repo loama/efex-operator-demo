@@ -120,6 +120,16 @@ describe("EFEX demo API", () => {
     expect((await submitted.json()).status).toBe("processing");
   });
 
+  test("quotes any supported demo currency pair", async () => {
+    const response = await app.request("/v1/quotes?sourceAmount=100000&sourceCurrency=COP&destinationCurrency=EUR");
+    expect(response.status).toBe(200);
+    const quote = await response.json();
+    expect(quote.sourceCurrency).toBe("COP");
+    expect(quote.destinationCurrency).toBe("EUR");
+    expect(quote.rate).toBeCloseTo(0.92 / 4120, 8);
+    expect(quote.destinationAmount).toBe(22.33);
+  });
+
   test("rejects invalid payment input", async () => {
     const response = await app.request("/v1/payments", {
       method: "POST",

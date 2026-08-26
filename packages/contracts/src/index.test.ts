@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createBeneficiarySchema, createPaymentSchema } from "./index";
+import { createBeneficiarySchema, createPaymentSchema, currencySchema } from "./index";
 
 describe("contract validation", () => {
   test("accepts a complete beneficiary", () => {
@@ -23,5 +23,9 @@ describe("contract validation", () => {
       reference: "Invoice 1004",
     });
     expect(result.success).toBe(false);
+  });
+
+  test("accepts the six demo conversion currencies", () => {
+    expect(["USD", "MXN", "EUR", "COP", "UYU", "ARS"].every((currency) => currencySchema.safeParse(currency).success)).toBe(true);
   });
 });

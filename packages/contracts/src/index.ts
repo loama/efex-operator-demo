@@ -1,7 +1,8 @@
 import { z } from "zod";
 
-export const currencySchema = z.enum(["USD", "MXN"]);
+export const currencySchema = z.enum(["USD", "MXN", "EUR", "COP", "UYU", "ARS"]);
 export type Currency = z.infer<typeof currencySchema>;
+export const supportedCurrencies = currencySchema.options;
 
 export const accountSchema = z.object({
   id: z.string(),
