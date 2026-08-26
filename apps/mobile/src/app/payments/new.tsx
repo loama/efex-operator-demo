@@ -2,12 +2,12 @@ import { Ionicons } from "@expo/vector-icons";
 import type { Beneficiary, Payment, Quote } from "@efex/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppShell } from "../../components/app-shell";
-import { Avatar, Button, Card, EmptyState, ErrorState, Field, LoadingState, Pill } from "../../components/ui";
+import { Avatar, Button, Card, CurrencyField, EmptyState, ErrorState, Field, LoadingState, Pill } from "../../components/ui";
 import { useHydratedWindowWidth } from "../../hooks/use-hydrated-window-width";
 import { api } from "../../lib/api";
-import { initials, money } from "../../lib/format";
+import { initials, money, normalizeCurrencyInput, parseCurrencyInput } from "../../lib/format";
 import { colors, fonts } from "../../lib/theme";
 
 type Step = "beneficiary" | "amount" | "review" | "done";
@@ -15,12 +15,16 @@ type Step = "beneficiary" | "amount" | "review" | "done";
 export default function NewPaymentScreen() {
   const params = useLocalSearchParams<{ beneficiaryId?: string; amount?: string }>();
   const [step, setStep] = useState<Step>("beneficiary"); const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]); const [selected, setSelected] = useState<Beneficiary>();
-  const [amount, setAmount] = useState(params.amount ?? "25000"); const [reference, setReference] = useState("Invoice 1088"); const [quote, setQuote] = useState<Quote>(); const [payment, setPayment] = useState<Payment>();
-  const [loading, setLoading] = useState(true); const [error, setError] = useState<string>(); const [scale] = useState(() => new Animated.Value(0.75));
+  const [amount, setAmount] = useState(() => normalizeCurrencyInput(params.amount ?? "25000")); const [reference, setReference] = useState("Invoice 1088"); const [quote, setQuote] = useState<Quote>(); const [payment, setPayment] = useState<Payment>();
+  const [loading, setLoading] = useState(true); const [error, setError] = useState<string>(); const [successProgress] = useState(() => new Animated.Value(0));
   const narrow = useHydratedWindowWidth() < 480;
 
   useEffect(() => { void api.beneficiaries().then((items) => { setBeneficiaries(items); const match = items.find((item) => item.id === params.beneficiaryId); if (match) { setSelected(match); setStep("amount"); } }).catch((reason) => setError(reason instanceof Error ? reason.message : "Error desconocido")).finally(() => setLoading(false)); }, [params.beneficiaryId]);
-  useEffect(() => { if (step === "done") Animated.spring(scale, { toValue: 1, friction: 5, tension: 80, useNativeDriver: Platform.OS !== "web" }).start(); }, [scale, step]);
+  useEffect(() => {
+    if (step !== "done") return;
+    successProgress.setValue(0);
+    Animated.timing(successProgress, { duration: 240, easing: Easing.out(Easing.cubic), toValue: 1, useNativeDriver: Platform.OS !== "web" }).start();
+  }, [step, successProgress]);
 
   async function retryBeneficiaries() {
     setLoading(true); setError(undefined);
@@ -28,7 +32,7 @@ export default function NewPaymentScreen() {
   }
 
   async function getQuote() {
-    const value = Number(amount);
+    const value = parseCurrencyInput(amount);
     if (!Number.isFinite(value) || value <= 0) return setError("Ingresa un monto válido");
     setLoading(true); setError(undefined);
     try { setQuote(await api.quote(value, "USD", selected?.currency ?? "MXN")); setStep("review"); } catch (reason) { setError(reason instanceof Error ? reason.message : "No fue posible cotizar"); } finally { setLoading(false); }
@@ -51,9 +55,9 @@ export default function NewPaymentScreen() {
     {step === "beneficiary" && !loading && !error && beneficiaries.length ? <Card style={styles.panel}><Text style={styles.panelTitle}>Elige un beneficiario</Text>{beneficiaries.map((item) => <Pressable accessibilityLabel={`Enviar a ${item.name}`} accessibilityRole="button" key={item.id} onPress={() => { setSelected(item); setStep("amount"); }} style={styles.beneficiary}><Avatar label={initials(item.name)} /><View style={styles.flex}><Text style={styles.name}>{item.name}</Text><Text style={styles.meta}>{item.bank} · {item.accountNumber}</Text></View><Ionicons color={colors.muted} name="chevron-forward" size={18} /></Pressable>)}</Card> : null}
     {step === "amount" && selected ? <Card style={styles.panel}>
       <View style={styles.selected}><Avatar label={initials(selected.name)} /><View style={styles.flex}><Text style={styles.name}>Para {selected.name}</Text><Text style={styles.meta}>{selected.bank} · {selected.currency}</Text></View><Button label="Cambiar" onPress={() => setStep("beneficiary")} variant="quiet" /></View>
-      <Field keyboardType="decimal-pad" label="Monto a enviar en USD" onChangeText={setAmount} placeholder="25,000.00" value={amount} />
+      <CurrencyField currency="USD" label="Monto a enviar" onValueChange={setAmount} value={amount} />
       <Field label="Concepto" onChangeText={setReference} placeholder="Invoice 1088" value={reference} />
-      {error ? <Text style={styles.error}>{error}</Text> : null}<Button disabled={!reference.trim() || Number(amount) <= 0} label="Revisar pago" loading={loading} onPress={() => void getQuote()} />
+      {error ? <Text style={styles.error}>{error}</Text> : null}<Button disabled={!reference.trim() || !(parseCurrencyInput(amount) > 0)} label="Revisar pago" loading={loading} onPress={() => void getQuote()} />
     </Card> : null}
     {step === "review" && selected && quote ? <Card style={styles.panel}>
       <View style={styles.reviewTop}><View><Text style={styles.reviewLabel}>Envías</Text><Text style={styles.reviewAmount}>{money(quote.sourceAmount, "USD")}</Text></View><Ionicons color={colors.ink} name="arrow-forward" size={24} /><View style={styles.reviewRight}><Text style={styles.reviewLabel}>Recibe</Text><Text style={styles.reviewAmount}>{money(quote.destinationAmount, selected.currency)}</Text></View></View>
@@ -61,7 +65,7 @@ export default function NewPaymentScreen() {
       <View style={styles.warning}><Pill tone="yellow">SIMULACIÓN</Pill><Text style={styles.warningText}>Confirmar no moverá fondos reales.</Text></View>
       {error ? <Text style={styles.error}>{error}</Text> : null}<View style={[styles.actions, narrow && styles.actionsNarrow]}><Button label="Atrás" onPress={() => setStep("amount")} variant="secondary" /><Button label="Confirmar pago demo" loading={loading} onPress={() => void send()} /></View>
     </Card> : null}
-    {step === "done" && payment ? <Animated.View style={{ transform: [{ scale }] }}><Card style={styles.success}>
+    {step === "done" && payment ? <Animated.View style={{ opacity: successProgress, transform: [{ translateY: successProgress.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }}><Card style={styles.success}>
       <View style={styles.successIcon}><Ionicons color={colors.ink} name="checkmark" size={30} /></View><Pill tone="warning">En proceso</Pill>
       <Text style={styles.successTitle}>Pago simulado enviado</Text><Text style={styles.successAmount}>{money(payment.sourceAmount, payment.sourceCurrency)}</Text><Text style={styles.successText}>El pago a {payment.beneficiaryName} quedó registrado con el identificador {payment.id.slice(0, 18)}.</Text>
       <Button label="Ver pagos" onPress={() => router.replace("/payments")} /><Button label="Volver al inicio" onPress={() => router.replace("/")} variant="secondary" />

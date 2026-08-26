@@ -14,9 +14,16 @@ async function stubApi(page: Page) {
     const pathname = new URL(route.request().url()).pathname;
     const body = pathname === "/v1/dashboard"
       ? {
-          accounts: [],
+          accounts: [{
+            accountNumber: "•••• 1208",
+            available: 875_000,
+            balance: 900_000,
+            currency: "USD",
+            id: "account_usd",
+            name: "Cuenta global USD",
+          }],
           activity: [],
-          company: { id: "company_test", name: "Asteria Imports" },
+          company: { contactName: "Santiago Bustamante", name: "Asteria Imports" },
           demoReceivedUsd: 150_000,
           demoSentUsd: 48_900,
           totalUsd: 940_897.41,
@@ -60,4 +67,18 @@ test("home hydrates into the phone layout", async ({ page }) => {
   await expect(page.getByText("DEMO", { exact: true })).toBeVisible();
   await expect(page.getByText("Asteria Imports", { exact: true })).toHaveCount(0);
   await expect(page.getByText("PRÓXIMAMENTE", { exact: true })).toHaveCount(0);
+});
+
+test("currency fields format values when editing finishes", async ({ page }) => {
+  await stubApi(page);
+  await page.setViewportSize({ height: 844, width: 390 });
+  await page.goto("/convert", { waitUntil: "networkidle" });
+
+  const amount = page.getByLabel("Monto a convertir");
+  await expect(amount).toHaveValue("25,000.00");
+  await amount.focus();
+  await expect(amount).toHaveValue("25000");
+  await amount.fill("12345,6");
+  await amount.press("Tab");
+  await expect(amount).toHaveValue("12,345.60");
 });

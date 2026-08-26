@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useState, type PropsWithChildren, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, type TextInputProps, View, type StyleProp, type ViewStyle } from "react-native";
+import { formatCurrencyInput, normalizeCurrencyInput } from "../lib/format";
 import { colors, fonts } from "../lib/theme";
 
 export function Card({ children, style }: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
@@ -55,7 +56,7 @@ export function Button({
 
 export function Field({ label, error, ...props }: TextInputProps & { label: string; error?: string }) {
   const [focused, setFocused] = useState(false);
-  const { onBlur, onFocus, ...inputProps } = props;
+  const { onBlur, onFocus, style, ...inputProps } = props;
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -64,10 +65,39 @@ export function Field({ label, error, ...props }: TextInputProps & { label: stri
         onBlur={(event) => { setFocused(false); onBlur?.(event); }}
         onFocus={(event) => { setFocused(true); onFocus?.(event); }}
         placeholderTextColor={colors.quiet}
-        style={[styles.field, focused && styles.fieldFocused, error ? styles.fieldError : undefined]}
+        style={[styles.field, focused && styles.fieldFocused, error ? styles.fieldError : undefined, style]}
         {...inputProps}
       />
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
+    </View>
+  );
+}
+
+export function CurrencyField({
+  currency,
+  label,
+  onValueChange,
+  value,
+}: {
+  currency: string;
+  label: string;
+  onValueChange: (value: string) => void;
+  value: string;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <View style={styles.currencyFieldWrap}>
+      <Field
+        keyboardType="decimal-pad"
+        label={label}
+        onBlur={() => setFocused(false)}
+        onChangeText={(nextValue) => onValueChange(normalizeCurrencyInput(nextValue))}
+        onFocus={() => setFocused(true)}
+        selectTextOnFocus
+        style={styles.currencyInput}
+        value={focused ? value : formatCurrencyInput(value)}
+      />
+      <View pointerEvents="none" style={styles.currencyCode}><Text style={styles.currencyCodeText}>{currency}</Text></View>
     </View>
   );
 }
@@ -141,7 +171,7 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.45 },
   buttonFocusedPrimary: { borderColor: colors.yellow },
   buttonFocusedLight: { borderColor: colors.inkSoft },
-  buttonPressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },
+  buttonPressed: { opacity: 0.9, transform: [{ scale: 0.985 }] },
   buttonLabel: { color: colors.paper, fontFamily: fonts.bodySemiBold, fontSize: 14 },
   buttonLabelDark: { color: colors.ink },
   fieldWrap: { gap: 7 },
@@ -150,6 +180,10 @@ const styles = StyleSheet.create({
   fieldFocused: { borderColor: colors.ink },
   fieldError: { borderColor: colors.red },
   errorText: { color: colors.red, fontFamily: fonts.body, fontSize: 12 },
+  currencyFieldWrap: { position: "relative" },
+  currencyInput: { paddingRight: 66 },
+  currencyCode: { alignItems: "center", backgroundColor: colors.canvas, borderRadius: 7, bottom: 7, height: 36, justifyContent: "center", position: "absolute", right: 7, width: 48 },
+  currencyCodeText: { color: colors.inkSoft, fontFamily: fonts.bodySemiBold, fontSize: 11 },
   pill: { alignSelf: "flex-start", backgroundColor: colors.canvas, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
   pillSuccess: { backgroundColor: colors.greenSoft },
   pillWarning: { backgroundColor: colors.amberSoft },
