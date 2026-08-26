@@ -1,4 +1,4 @@
-import type { AssistantResponse } from "@efex/contracts";
+import { currencySchema, supportedCurrencies, type AssistantResponse, type Currency } from "@efex/contracts";
 import { z } from "zod";
 import type { TreasuryService } from "./service";
 
@@ -40,8 +40,8 @@ type AssistantOptions = {
 };
 
 const quoteArgumentsSchema = z.object({
-  sourceCurrency: z.enum(["USD", "MXN"]),
-  destinationCurrency: z.enum(["USD", "MXN"]),
+  sourceCurrency: currencySchema,
+  destinationCurrency: currencySchema,
   sourceAmount: z.number().positive().max(1_000_000),
 });
 
@@ -128,8 +128,8 @@ const tools: Array<Record<string, unknown>> = [
     parameters: {
       type: "object",
       properties: {
-        sourceCurrency: { type: "string", enum: ["USD", "MXN"] },
-        destinationCurrency: { type: "string", enum: ["USD", "MXN"] },
+        sourceCurrency: { type: "string", enum: supportedCurrencies },
+        destinationCurrency: { type: "string", enum: supportedCurrencies },
         sourceAmount: { type: "number", minimum: 0.01, maximum: 1_000_000 },
       },
       required: ["sourceCurrency", "destinationCurrency", "sourceAmount"],
@@ -192,7 +192,7 @@ export function createAzureOpenAIRequester(apiKey: string, baseUrl: string): Mod
   return createResponsesRequester(baseUrl, { "api-key": apiKey }, "Azure OpenAI");
 }
 
-function formatAmount(amount: number, currency: "USD" | "MXN") {
+function formatAmount(amount: number, currency: Currency) {
   return `${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
 }
 
@@ -245,7 +245,7 @@ function groundedCallArguments(service: TreasuryService, message: string, call: 
   }
   if (call.name === "get_quote") {
     const input = quoteArgumentsSchema.parse(JSON.parse(call.arguments));
-    const currencies = [...message.toUpperCase().matchAll(/\b(USD|MXN)\b/g)].map((match) => match[1] as "USD" | "MXN");
+    const currencies = [...message.toUpperCase().matchAll(/\b(USD|MXN|EUR|COP|UYU|ARS)\b/g)].map((match) => match[1] as Currency);
     const amountToken = message.match(/\d[\d.,]*/)?.[0];
     let mentionedAmount: number | undefined;
     if (amountToken) {

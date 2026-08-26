@@ -2,6 +2,7 @@ import type {
   Activity,
   AssistantResponse,
   Beneficiary,
+  Currency,
   CreateBeneficiaryInput,
   CreatePaymentInput,
   Dashboard,
@@ -13,7 +14,7 @@ import type { EfexDatabase } from "./database";
 
 type AccountRow = {
   id: string;
-  currency: "USD" | "MXN";
+  currency: Currency;
   name: string;
   balance: number;
   available: number;
@@ -24,7 +25,7 @@ type BeneficiaryRow = {
   name: string;
   country: string;
   bank: string;
-  currency: "USD" | "MXN";
+  currency: Currency;
   account_number: string;
   reference: string;
   status: "active" | "pending";
@@ -34,8 +35,8 @@ type PaymentRow = {
   id: string;
   beneficiary_id: string;
   beneficiary_name: string;
-  source_currency: "USD" | "MXN";
-  destination_currency: "USD" | "MXN";
+  source_currency: Currency;
+  destination_currency: Currency;
   source_amount: number;
   destination_amount: number;
   fee: number;
@@ -47,6 +48,15 @@ type PaymentRow = {
 };
 
 export class TreasuryValidationError extends Error {}
+
+const unitsPerUsd: Record<Currency, number> = {
+  USD: 1,
+  MXN: 17.12,
+  EUR: 0.92,
+  COP: 4120,
+  UYU: 43.1,
+  ARS: 1325,
+};
 
 const accountFromRow = (row: AccountRow) => ({
   id: row.id,
@@ -131,7 +141,7 @@ export function createTreasuryService(db: EfexDatabase) {
         createdAt: payment.createdAt,
       })),
     ];
-    const toUsd = (amount: number, currency: "USD" | "MXN") => currency === "USD" ? amount : amount / 17.12;
+    const toUsd = (amount: number, currency: Currency) => amount / unitsPerUsd[currency];
     return {
       company: { name: "Asteria Imports", contactName: "Santiago Bustamante" },
       totalUsd: Number(accounts.reduce((total, account) => total + toUsd(account.balance, account.currency), 0).toFixed(2)),
@@ -160,8 +170,8 @@ export function createTreasuryService(db: EfexDatabase) {
     return listBeneficiaries().find((item) => item.id === id)!;
   }
 
-  function quote(sourceCurrency: "USD" | "MXN", destinationCurrency: "USD" | "MXN", sourceAmount: number): Quote {
-    const rate = sourceCurrency === destinationCurrency ? 1 : sourceCurrency === "USD" ? 17.12 : 1 / 17.12;
+  function quote(sourceCurrency: Currency, destinationCurrency: Currency, sourceAmount: number): Quote {
+    const rate = unitsPerUsd[destinationCurrency] / unitsPerUsd[sourceCurrency];
     const fee = 0;
     return {
       sourceCurrency,
