@@ -69,7 +69,7 @@ test("home hydrates into the phone layout", async ({ page }) => {
   await expect(page.getByText("PRÓXIMAMENTE", { exact: true })).toHaveCount(0);
 });
 
-test("currency fields format values when editing finishes", async ({ page }) => {
+test("currency fields stay formatted while typing", async ({ page }) => {
   await stubApi(page);
   await page.setViewportSize({ height: 844, width: 390 });
   await page.goto("/convert", { waitUntil: "networkidle" });
@@ -77,8 +77,9 @@ test("currency fields format values when editing finishes", async ({ page }) => 
   const amount = page.getByLabel("Monto a convertir");
   await expect(amount).toHaveValue("25,000.00");
   await amount.focus();
-  await expect(amount).toHaveValue("25000");
-  await amount.fill("12345,6");
+  await expect(amount).toHaveValue("25,000");
+  await amount.fill("12345.6");
+  await expect(amount).toHaveValue("12,345.6");
   await amount.press("Tab");
   await expect(amount).toHaveValue("12,345.60");
 });

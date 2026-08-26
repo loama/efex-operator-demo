@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useState, type PropsWithChildren, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, type TextInputProps, View, type StyleProp, type ViewStyle } from "react-native";
-import { formatCurrencyInput, normalizeCurrencyInput } from "../lib/format";
+import { formatCurrencyInput, formatCurrencyInputForEditing, normalizeCurrencyInputChange } from "../lib/format";
 import { colors, fonts } from "../lib/theme";
 
 export function Card({ children, style }: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
@@ -91,11 +91,11 @@ export function CurrencyField({
         keyboardType="decimal-pad"
         label={label}
         onBlur={() => setFocused(false)}
-        onChangeText={(nextValue) => onValueChange(normalizeCurrencyInput(nextValue))}
+        onChangeText={(nextValue) => onValueChange(normalizeCurrencyInputChange(nextValue, value))}
         onFocus={() => setFocused(true)}
         selectTextOnFocus
         style={styles.currencyInput}
-        value={focused ? value : formatCurrencyInput(value)}
+        value={focused ? formatCurrencyInputForEditing(value) : formatCurrencyInput(value)}
       />
       <View pointerEvents="none" style={styles.currencyCode}><Text style={styles.currencyCodeText}>{currency}</Text></View>
     </View>
@@ -184,11 +184,11 @@ const styles = StyleSheet.create({
   currencyInput: { paddingRight: 66 },
   currencyCode: { alignItems: "center", backgroundColor: colors.canvas, borderRadius: 7, bottom: 7, height: 36, justifyContent: "center", position: "absolute", right: 7, width: 48 },
   currencyCodeText: { color: colors.inkSoft, fontFamily: fonts.bodySemiBold, fontSize: 11 },
-  pill: { alignSelf: "flex-start", backgroundColor: colors.canvas, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
+  pill: { alignItems: "center", alignSelf: "flex-start", backgroundColor: colors.canvas, borderRadius: 999, justifyContent: "center", minHeight: 25, paddingHorizontal: 9, paddingVertical: 4 },
   pillSuccess: { backgroundColor: colors.greenSoft },
   pillWarning: { backgroundColor: colors.amberSoft },
   pillYellow: { backgroundColor: colors.yellow },
-  pillText: { color: colors.inkSoft, fontFamily: fonts.bodyMedium, fontSize: 11 },
+  pillText: { color: colors.inkSoft, fontFamily: fonts.bodyMedium, fontSize: 11, lineHeight: 15 },
   pillTextSuccess: { color: colors.green },
   pillTextWarning: { color: colors.amber },
   sectionTitleRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },

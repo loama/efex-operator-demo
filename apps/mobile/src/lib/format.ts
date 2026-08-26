@@ -31,6 +31,27 @@ export function formatCurrencyInput(input: string) {
   return new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
 }
 
+export function formatCurrencyInputForEditing(input: string) {
+  const normalized = normalizeCurrencyInput(input);
+  if (!normalized) return "";
+  const [integerPart, fractionPart] = normalized.split(".");
+  const groupedInteger = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(Number(integerPart));
+  return normalized.includes(".") ? `${groupedInteger}.${fractionPart ?? ""}` : groupedInteger;
+}
+
+export function normalizeCurrencyInputChange(input: string, previousValue: string) {
+  const previousFormatted = formatCurrencyInputForEditing(previousValue);
+  if (input.startsWith(previousFormatted) && input.length === previousFormatted.length + 1) {
+    const appended = input.at(-1) ?? "";
+    if (/\d/.test(appended)) return normalizeCurrencyInput(`${previousValue}${appended}`);
+    if ((appended === "." || appended === ",") && !previousValue.includes(".")) return `${previousValue}.`;
+  }
+  if (previousFormatted.startsWith(input) && input.length === previousFormatted.length - 1) {
+    return previousValue.slice(0, -1);
+  }
+  return normalizeCurrencyInput(input);
+}
+
 export function compactMoney(amount: number, currency: string) {
   const symbol = currency === "USD" ? "$" : `${currency} `;
   const compact = amount >= 1_000_000 ? `${trimDecimal(amount / 1_000_000)}M` : amount >= 1_000 ? `${trimDecimal(amount / 1_000)}K` : trimDecimal(amount);
