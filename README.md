@@ -16,7 +16,7 @@ No operation connects to a bank or moves real money.
 
 5. Account statements are generated as valid synthetic PDF documents.
 
-6. The assistant uses the OpenAI Responses API with typed read tools for balances, payments, beneficiaries, statements, and conversion quotes. Every answer is grounded in the same synthetic records shown by the app. A deterministic answer remains available if the model service cannot respond.
+6. The assistant uses the Azure Responses API with typed read tools for balances, payments, beneficiaries, statements, and conversion quotes. Every answer is grounded in the same synthetic records shown by the app. A deterministic answer remains available if the model service cannot respond.
 
 7. A Kapso webhook adapter can answer inbound WhatsApp messages when credentials are present. Persistent message claims prevent duplicate replies. Native WhatsApp buttons open the relevant app screen, while statements arrive as PDF documents. A simulation endpoint proves the same behavior without credentials.
 
