@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import type { Href } from "expo-router";
 import { router, usePathname } from "expo-router";
 import { useState, type PropsWithChildren } from "react";
@@ -31,7 +32,7 @@ export function AppShell({ children, title, subtitle, action }: PropsWithChildre
       <SafeAreaView style={styles.root}>
         <View style={styles.desktopLayout}>
           <View style={styles.sidebar}>
-            <Text style={styles.logo}>EFEX</Text>
+            <Image accessibilityLabel="EFEX" contentFit="contain" source={require("../../assets/images/efex-wordmark.png")} style={styles.logo} />
             <Pressable accessibilityLabel="Abrir acceso de la empresa" accessibilityRole="button" onBlur={() => setFocusedControl(undefined)} onFocus={() => setFocusedControl("company")} onPress={() => go("/access")} style={[styles.companyBlock, focusedControl === "company" && styles.companyBlockFocused]}>
               <Avatar label="AI" size={36} />
               <View style={styles.companyCopy}>
@@ -78,7 +79,7 @@ export function AppShell({ children, title, subtitle, action }: PropsWithChildre
   return (
     <SafeAreaView style={styles.mobileRoot}>
       <View style={styles.mobileTopbar}>
-        <Text style={styles.logo}>EFEX</Text>
+        <Image accessibilityLabel="EFEX" contentFit="contain" source={require("../../assets/images/efex-wordmark.png")} style={styles.logo} />
         <View style={styles.mobileTopActions}>
           <Pill tone="yellow">DEMO</Pill>
           <Pressable accessibilityLabel="Abrir acceso de la empresa" accessibilityRole="button" onBlur={() => setFocusedControl(undefined)} onFocus={() => setFocusedControl("company")} onPress={() => go("/access")} style={[styles.mobileProfile, focusedControl === "company" && styles.mobileProfileFocused]}><Avatar label="SB" size={34} /></Pressable>
@@ -111,7 +112,7 @@ const styles = StyleSheet.create({
   root: { backgroundColor: colors.ink, flex: 1 },
   desktopLayout: { flex: 1, flexDirection: "row" },
   sidebar: { backgroundColor: colors.ink, minHeight: "100%", paddingHorizontal: 22, paddingVertical: 26, width: 248 },
-  logo: { color: colors.paper, fontFamily: fonts.headingBold, fontSize: 21, letterSpacing: 3 },
+  logo: { height: 17, width: 82 },
   companyBlock: { alignItems: "center", borderBottomColor: "#303030", borderBottomWidth: 1, borderRadius: 8, flexDirection: "row", gap: 11, marginTop: 28, paddingHorizontal: 6, paddingBottom: 18, paddingTop: 6 },
   companyBlockFocused: { backgroundColor: colors.inkSoft },
   companyCopy: { flex: 1, gap: 2 },

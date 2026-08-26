@@ -1,28 +1,27 @@
 {
   "expo": {
-    "name": "EFEX Operator Demo",
+    "name": "EFEX",
     "slug": "efex-operator-demo",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "efexdemo",
+    "icon": "./assets/images/efex-icon.png",
+    "scheme": "efex",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.loama.efexoperatordemo"
+      "icon": "./assets/images/efex-icon.png",
+      "bundleIdentifier": "com.efex.operatordemo"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#111111",
+        "foregroundImage": "./assets/images/efex-mark-transparent.png",
+        "monochromeImage": "./assets/images/efex-mark-transparent.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/efex-favicon.png"
     },
     "plugins": [
       "expo-router",
@@ -30,8 +29,8 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#111111",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "image": "./assets/images/efex-wordmark.png",
+          "imageWidth": 118
         }
       ]
     ],
