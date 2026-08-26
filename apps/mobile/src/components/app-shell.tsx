@@ -2,8 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import type { Href } from "expo-router";
 import { router, usePathname } from "expo-router";
-import { useState, type PropsWithChildren } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState, type PropsWithChildren } from "react";
+import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useHydratedWindowWidth } from "../hooks/use-hydrated-window-width";
 import { colors, fonts } from "../lib/theme";
@@ -24,8 +24,17 @@ export function AppShell({ children, title, subtitle, action }: PropsWithChildre
   const desktop = width >= 900;
   const pathname = usePathname();
   const [focusedControl, setFocusedControl] = useState<string>();
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
-  const go = (route: string) => router.push(route as Href);
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showSubscription = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSubscription = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    return () => { showSubscription.remove(); hideSubscription.remove(); };
+  }, []);
+
+  const replacePrimaryRoute = (route: string) => router.replace(route as Href);
 
   if (desktop) {
     return (
@@ -33,7 +42,7 @@ export function AppShell({ children, title, subtitle, action }: PropsWithChildre
         <View style={styles.desktopLayout}>
           <View style={styles.sidebar}>
             <Image accessibilityLabel="EFEX" contentFit="contain" source={require("../../assets/images/efex-wordmark.png")} style={styles.logo} />
-            <Pressable accessibilityLabel="Abrir acceso de la empresa" accessibilityRole="button" onBlur={() => setFocusedControl(undefined)} onFocus={() => setFocusedControl("company")} onPress={() => go("/access")} style={[styles.companyBlock, focusedControl === "company" && styles.companyBlockFocused]}>
+            <Pressable accessibilityLabel="Abrir acceso de la empresa" accessibilityRole="button" onBlur={() => setFocusedControl(undefined)} onFocus={() => setFocusedControl("company")} onPress={() => router.push("/access")} style={[styles.companyBlock, focusedControl === "company" && styles.companyBlockFocused]}>
               <Avatar label="AI" size={36} />
               <View style={styles.companyCopy}>
                 <Text style={styles.companyName}>Asteria Imports</Text>
@@ -44,7 +53,7 @@ export function AppShell({ children, title, subtitle, action }: PropsWithChildre
               {navigation.map((item) => {
                 const active = item.route === "/" ? pathname === "/" : pathname.startsWith(item.route);
                 return (
-                  <Pressable accessibilityLabel={item.label} accessibilityRole="button" accessibilityState={{ selected: active }} key={item.route} onBlur={() => setFocusedControl(undefined)} onFocus={() => setFocusedControl(item.route)} onPress={() => go(item.route)} style={[styles.navItem, active && styles.navItemActive, focusedControl === item.route && styles.navItemFocused]}>
+                  <Pressable accessibilityLabel={item.label} accessibilityRole="button" accessibilityState={{ selected: active }} key={item.route} onBlur={() => setFocusedControl(undefined)} onFocus={() => setFocusedControl(item.route)} onPress={() => replacePrimaryRoute(item.route)} style={[styles.navItem, active && styles.navItemActive, focusedControl === item.route && styles.navItemFocused]}>
                     <Ionicons color={active ? colors.ink : "#B9B9B9"} name={item.icon} size={19} />
                     <Text style={[styles.navText, active && styles.navTextActive]}>{item.label}</Text>
                   </Pressable>
@@ -82,28 +91,30 @@ export function AppShell({ children, title, subtitle, action }: PropsWithChildre
         <Image accessibilityLabel="EFEX" contentFit="contain" source={require("../../assets/images/efex-wordmark.png")} style={styles.logo} />
         <View style={styles.mobileTopActions}>
           <Pill tone="yellow">DEMO</Pill>
-          <Pressable accessibilityLabel="Abrir acceso de la empresa" accessibilityRole="button" onBlur={() => setFocusedControl(undefined)} onFocus={() => setFocusedControl("company")} onPress={() => go("/access")} style={[styles.mobileProfile, focusedControl === "company" && styles.mobileProfileFocused]}><Avatar label="SB" size={34} /></Pressable>
+          <Pressable accessibilityLabel="Abrir acceso de la empresa" accessibilityRole="button" onBlur={() => setFocusedControl(undefined)} onFocus={() => setFocusedControl("company")} onPress={() => router.push("/access")} style={[styles.mobileProfile, focusedControl === "company" && styles.mobileProfileFocused]}><Avatar label="SB" size={34} /></Pressable>
         </View>
       </View>
-      <ScrollView contentContainerStyle={styles.mobileScroll} style={styles.mobileMain}>
-        <View style={styles.mobileHeader}>
-          <Text style={styles.mobileTitle}>{title}</Text>
-          {subtitle ? <Text style={styles.mobileSubtitle}>{subtitle}</Text> : null}
-          {action ? <View style={styles.mobileAction}>{action}</View> : null}
-        </View>
-        {children}
-      </ScrollView>
-      <View style={styles.bottomNav}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.mobileBody}>
+        <ScrollView contentContainerStyle={[styles.mobileScroll, keyboardVisible && styles.mobileScrollKeyboard]} keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"} keyboardShouldPersistTaps="handled" style={styles.mobileMain}>
+          <View style={styles.mobileHeader}>
+            <Text style={styles.mobileTitle}>{title}</Text>
+            {subtitle ? <Text style={styles.mobileSubtitle}>{subtitle}</Text> : null}
+            {action ? <View style={styles.mobileAction}>{action}</View> : null}
+          </View>
+          {children}
+        </ScrollView>
+      </KeyboardAvoidingView>
+      {!keyboardVisible ? <View style={styles.bottomNav}>
         {navigation.map((item) => {
           const active = item.route === "/" ? pathname === "/" : pathname.startsWith(item.route);
           return (
-            <Pressable accessibilityLabel={item.label} accessibilityRole="button" accessibilityState={{ selected: active }} key={item.route} onBlur={() => setFocusedControl(undefined)} onFocus={() => setFocusedControl(item.route)} onPress={() => go(item.route)} style={[styles.bottomItem, focusedControl === item.route && styles.bottomItemFocused]}>
+            <Pressable accessibilityLabel={item.label} accessibilityRole="button" accessibilityState={{ selected: active }} key={item.route} onBlur={() => setFocusedControl(undefined)} onFocus={() => setFocusedControl(item.route)} onPress={() => replacePrimaryRoute(item.route)} style={[styles.bottomItem, focusedControl === item.route && styles.bottomItemFocused]}>
               <View style={[styles.bottomIcon, active && styles.bottomIconActive]}><Ionicons color={active ? colors.ink : colors.muted} name={item.icon} size={20} /></View>
               <Text numberOfLines={1} style={[styles.bottomLabel, active && styles.bottomLabelActive]}>{item.label}</Text>
             </Pressable>
           );
         })}
-      </View>
+      </View> : null}
     </SafeAreaView>
   );
 }
@@ -142,8 +153,10 @@ const styles = StyleSheet.create({
   mobileTopActions: { alignItems: "center", flexDirection: "row", gap: 10 },
   mobileProfile: { borderColor: "transparent", borderRadius: 20, borderWidth: 2 },
   mobileProfileFocused: { borderColor: colors.yellow },
+  mobileBody: { flex: 1 },
   mobileMain: { backgroundColor: colors.canvas, flex: 1 },
   mobileScroll: { gap: 18, paddingBottom: 116, paddingHorizontal: 16, paddingTop: 24 },
+  mobileScrollKeyboard: { paddingBottom: 28 },
   mobileHeader: { gap: 5 },
   mobileTitle: { color: colors.ink, fontFamily: fonts.headingBold, fontSize: 27, letterSpacing: -0.5 },
   mobileSubtitle: { color: colors.muted, fontFamily: fonts.body, fontSize: 13, lineHeight: 19 },
