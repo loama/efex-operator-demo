@@ -1,27 +1,5 @@
 services:
   - type: web
-    name: efex-operator-demo-api-loama
-    runtime: node
-    plan: free
-    region: frankfurt
-    branch: main
-    autoDeployTrigger: checksPass
-    buildCommand: bun install --frozen-lockfile
-    startCommand: bun run --cwd apps/api start
-    healthCheckPath: /health
-    envVars:
-      - key: BUN_VERSION
-        value: 1.3.13
-      - key: DATABASE_PATH
-        value: /tmp/efex-demo.sqlite
-      - key: WEB_ORIGIN
-        value: https://efex-operator-demo-loama.onrender.com
-      - key: PUBLIC_API_ORIGIN
-        value: https://efex-operator-demo-api-loama.onrender.com
-      - key: DEMO_REQUEST_LIMIT
-        value: 120
-
-  - type: web
     name: efex-operator-demo-api-eduardo
     runtime: node
     plan: free
@@ -36,10 +14,22 @@ services:
         value: 1.3.13
       - key: DATABASE_PATH
         value: /tmp/efex-demo.sqlite
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-5.6-terra
+      - key: KAPSO_API_KEY
+        sync: false
+      - key: KAPSO_PHONE_NUMBER_ID
+        sync: false
+      - key: KAPSO_WEBHOOK_SECRET
+        sync: false
       - key: WEB_ORIGIN
         value: https://efex-operator-demo-loama.onrender.com
       - key: PUBLIC_API_ORIGIN
         value: https://efex-operator-demo-api-eduardo.onrender.com
+      - key: PUBLIC_APP_ORIGIN
+        value: https://efex-operator-demo-loama.onrender.com
       - key: DEMO_REQUEST_LIMIT
         value: 120
 

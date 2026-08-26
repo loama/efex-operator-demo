@@ -16,9 +16,9 @@ No operation connects to a bank or moves real money.
 
 5. Account statements are generated as valid synthetic PDF documents.
 
-6. The assistant answers questions about balances, payments, and statements using demo data.
+6. The assistant uses the OpenAI Responses API with typed read tools for balances, payments, beneficiaries, statements, and conversion quotes. Every answer is grounded in the same synthetic records shown by the app. A deterministic answer remains available if the model service cannot respond.
 
-7. A Kapso webhook adapter can answer inbound WhatsApp messages when credentials are present. Persistent message claims prevent duplicate replies. A simulation endpoint proves the same behavior without credentials.
+7. A Kapso webhook adapter can answer inbound WhatsApp messages when credentials are present. Persistent message claims prevent duplicate replies. Native WhatsApp buttons open the relevant app screen, while statements arrive as PDF documents. A simulation endpoint proves the same behavior without credentials.
 
 8. Future products are visible in a quiet disabled state so the product roadmap is clear without suggesting that incomplete flows already work.
 
@@ -73,13 +73,20 @@ KAPSO_API_KEY
 KAPSO_PHONE_NUMBER_ID
 KAPSO_WEBHOOK_SECRET
 PUBLIC_API_ORIGIN
+PUBLIC_APP_ORIGIN
 ```
 
-Register `POST /webhooks/kapso` for the `whatsapp.message.received` event on a number scoped Kapso webhook. The handler verifies `X-Webhook-Signature`, rejects malformed payloads, handles single or buffered text events, claims message identifiers in SQLite, generates an answer from the same demo service as the app, and sends text or a statement document through Kapso.
+Register `POST /webhooks/kapso` for the `whatsapp.message.received` event on a number scoped Kapso webhook with buffering disabled. Each inbound message then gets its own delivery request. The handler verifies `X-Webhook-Signature`, rejects malformed payloads, and can still process a defensive batch of up to ten text events concurrently. It claims each message identifier in SQLite, generates an answer from the same demo service as the app, and sends one interactive action or statement document before acknowledging success. Model and delivery requests have bounded deadlines. A failed event returns a retryable error and releases its claim, while completed events remain protected from duplicate replies.
 
 Without credentials, use `POST /v1/whatsapp/simulate` with `{ "message": "Necesito mi estado de cuenta" }`.
 
 Kapso setup follows the official [TypeScript SDK guide](https://docs.kapso.ai/docs/whatsapp/typescript-sdk/introduction) and [webhook guide](https://docs.kapso.ai/docs/platform/webhooks/overview).
+
+## OpenAI setup
+
+Set `OPENAI_API_KEY` on the API service to enable model routing. `OPENAI_MODEL` defaults to `gpt-5.6-terra`. The model sees the customer question, selects exactly one typed read function, and suggests filters for a requested payment, beneficiary, statement period, or conversion amount. It never receives account records. The server reconciles explicit names, identifiers, periods, currencies, and amounts from the original message before it executes the function. It then constructs the final answer, status, navigation route, and statement attachment from validated synthetic data. If the model request fails or the key is absent, the existing deterministic assistant responds instead.
+
+The assistant can explain synthetic account data, while the model only selects the relevant read function. It cannot execute payments or modify beneficiaries. Those operations remain explicit app flows with their existing validation and confirmation screens.
 
 ## Verification
 
