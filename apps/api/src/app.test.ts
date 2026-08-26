@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createHmac } from "node:crypto";
 import { createApp, resolveRequestLimit } from "./app";
+import type { ModelResponse } from "./assistant";
 import { createDatabase, seedDatabase, type EfexDatabase } from "./database";
 import { answerKapsoWebhook } from "./kapso";
 import { createTreasuryService } from "./service";
@@ -10,6 +11,7 @@ let app: ReturnType<typeof createApp>["app"];
 const originalWebhookSecret = process.env.KAPSO_WEBHOOK_SECRET;
 const originalPhoneNumberId = process.env.KAPSO_PHONE_NUMBER_ID;
 const originalPublicApiOrigin = process.env.PUBLIC_API_ORIGIN;
+const originalPublicAppOrigin = process.env.PUBLIC_APP_ORIGIN;
 const originalWebOrigin = process.env.WEB_ORIGIN;
 const originalRequestLimit = process.env.DEMO_REQUEST_LIMIT;
 
@@ -26,6 +28,8 @@ afterEach(() => {
   else delete process.env.KAPSO_PHONE_NUMBER_ID;
   if (originalPublicApiOrigin) process.env.PUBLIC_API_ORIGIN = originalPublicApiOrigin;
   else delete process.env.PUBLIC_API_ORIGIN;
+  if (originalPublicAppOrigin) process.env.PUBLIC_APP_ORIGIN = originalPublicAppOrigin;
+  else delete process.env.PUBLIC_APP_ORIGIN;
   if (originalWebOrigin) process.env.WEB_ORIGIN = originalWebOrigin;
   else delete process.env.WEB_ORIGIN;
   if (originalRequestLimit) process.env.DEMO_REQUEST_LIMIT = originalRequestLimit;
@@ -180,6 +184,28 @@ describe("EFEX demo API", () => {
     expect(beneficiaryAnswer.action.route).toBe("/beneficiaries");
   });
 
+  test("serves grounded model answers through the assistant endpoint", async () => {
+    const responses: ModelResponse[] = [
+      {
+        id: "response_tool",
+        outputText: "",
+        output: [{ type: "function_call", callId: "call_payments", name: "list_payments", arguments: "{}" }],
+      },
+    ];
+    app = createApp(db, { modelRequester: async () => responses.shift()! }).app;
+
+    const response = await app.request("/v1/assistant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "¿Cuál es el estado de mi último pago?" }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.text).toContain("Global Foods LLC");
+    expect(body.action.route).toBe("/payments");
+  });
+
   test("simulates an inbound WhatsApp message without credentials", async () => {
     const response = await app.request("/v1/whatsapp/simulate", {
       method: "POST",
@@ -211,6 +237,17 @@ describe("EFEX demo API", () => {
     expect(repeated[0]?.duplicate).toBe(true);
   });
 
+  test("reclaims a stale Kapso processing lease after a process interruption", () => {
+    const service = createTreasuryService(db);
+    expect(service.claimKapsoMessage("wamid.stale").claimed).toBe(true);
+    expect(service.claimKapsoMessage("wamid.stale").claimed).toBe(false);
+    db.prepare("UPDATE kapso_deliveries SET updated_at = ? WHERE message_id = ?").run("2020-01-01T00:00:00.000Z", "wamid.stale");
+
+    const restarted = createTreasuryService(db);
+
+    expect(restarted.claimKapsoMessage("wamid.stale").claimed).toBe(true);
+  });
+
   test("resumes a Kapso document retry without resending text", async () => {
     process.env.KAPSO_PHONE_NUMBER_ID = "demo_number";
     process.env.PUBLIC_API_ORIGIN = "https://demo.example";
@@ -228,8 +265,67 @@ describe("EFEX demo API", () => {
     await expect(answerKapsoWebhook(service, payload, delivery)).rejects.toThrow("Document transport failed");
     const retried = await answerKapsoWebhook(service, payload, delivery);
     expect(retried[0]?.delivered).toBe(true);
-    expect(textSends).toBe(1);
+    expect(textSends).toBe(0);
     expect(documentSends).toBe(2);
+  });
+
+  test("releases a Kapso claim when assistant processing fails", async () => {
+    const service = createTreasuryService(db);
+    const payload = { message: { id: "wamid.model_failure", type: "text", text: { body: "saldo" } }, phone_number_id: "demo_number" };
+    const failingAssistant = async () => {
+      throw new Error("Assistant failed");
+    };
+
+    await expect(answerKapsoWebhook(service, payload, undefined, failingAssistant)).rejects.toThrow("Assistant failed");
+    const retried = await answerKapsoWebhook(service, payload);
+
+    expect(retried[0]?.duplicate).not.toBe(true);
+    expect(retried[0]).toMatchObject({ response: { action: { route: "/accounts" } } });
+  });
+
+  test("isolates a failed event from the rest of a Kapso batch", async () => {
+    const service = createTreasuryService(db);
+    const payload = {
+      type: "whatsapp.message.received",
+      batch: true,
+      data: [
+        { message: { id: "wamid.batch_failure", type: "text", text: { body: "fallar" } }, phone_number_id: "demo_number" },
+        { message: { id: "wamid.batch_success", type: "text", text: { body: "saldo" } }, phone_number_id: "demo_number" },
+      ],
+    };
+    const responder = async (message: string) => {
+      if (message === "fallar") throw new Error("Assistant failed");
+      return service.assistant(message);
+    };
+
+    await expect(answerKapsoWebhook(service, payload, undefined, responder)).rejects.toThrow("Assistant failed");
+    const retried = await answerKapsoWebhook(service, payload);
+
+    expect(retried.find((answer) => answer.messageId === "wamid.batch_failure")?.duplicate).not.toBe(true);
+    expect(retried.find((answer) => answer.messageId === "wamid.batch_success")?.duplicate).toBe(true);
+  });
+
+  test("sends an interactive WhatsApp action without generating an image", async () => {
+    process.env.KAPSO_PHONE_NUMBER_ID = "demo_number";
+    process.env.PUBLIC_APP_ORIGIN = "https://efex.example";
+    const service = createTreasuryService(db);
+    const payload = {
+      message: { id: "wamid.action", type: "text", text: { body: "¿Cuál es mi saldo?" }, kapso: { phone_number: "5215550100", phone_number_id: "demo_number" } },
+      phone_number_id: "demo_number",
+    };
+    let textSends = 0;
+    const actions: Array<{ bodyText: string; parameters: { displayText: string; url: string } }> = [];
+    const delivery = {
+      sendText: async () => { textSends += 1; },
+      sendDocument: async () => {},
+      sendInteractiveCtaUrl: async (input: { bodyText: string; parameters: { displayText: string; url: string } }) => { actions.push(input); },
+    };
+
+    await answerKapsoWebhook(service, payload, delivery);
+
+    expect(textSends).toBe(0);
+    expect(actions[0]?.bodyText).toContain("saldo consolidado");
+    expect(actions[0]?.parameters.url).toBe("https://efex.example/accounts");
   });
 
   test("rejects signed malformed Kapso payloads", async () => {
@@ -246,6 +342,85 @@ describe("EFEX demo API", () => {
     });
     expect((await request("not json")).status).toBe(400);
     expect((await request(JSON.stringify({ type: "whatsapp.message.received", data: {} }))).status).toBe(400);
+    const oversizedBatch = Array.from({ length: 11 }, (_, index) => ({
+      message: { id: `wamid.${index}`, type: "text", text: { body: "saldo" } },
+      phone_number_id: "demo_number",
+    }));
+    expect((await request(JSON.stringify({ type: "whatsapp.message.received", batch: true, data: oversizedBatch }))).status).toBe(400);
+  });
+
+  test("acknowledges a valid Kapso webhook after processing succeeds", async () => {
+    const secret = "test webhook secret";
+    process.env.KAPSO_WEBHOOK_SECRET = secret;
+    const created = createApp(db, {
+      modelRequester: async () => ({
+        id: "response_tool",
+        outputText: "",
+        output: [{ type: "function_call", callId: "call_dashboard", name: "get_dashboard", arguments: "{}" }],
+      }),
+    });
+    app = created.app;
+    const body = JSON.stringify({
+      type: "whatsapp.message.received",
+      data: {
+        message: { id: "wamid.fast_ack", type: "text", text: { body: "Hola" } },
+        phone_number_id: "demo_number",
+      },
+    });
+
+    const response = await app.request("/webhooks/kapso", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Webhook-Event": "whatsapp.message.received",
+        "X-Webhook-Signature": createHmac("sha256", secret).update(body).digest("hex"),
+      },
+      body,
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, processed: 1 });
+  });
+
+  test("returns a retryable error when Kapso delivery fails", async () => {
+    const secret = "test webhook secret";
+    process.env.KAPSO_WEBHOOK_SECRET = secret;
+    process.env.KAPSO_PHONE_NUMBER_ID = "demo_number";
+    let sends = 0;
+    const created = createApp(db, {
+      kapsoDeliveryClient: {
+        sendText: async () => {
+          sends += 1;
+          if (sends === 1) throw new Error("Kapso transport failed");
+        },
+        sendDocument: async () => {},
+      },
+    });
+    const body = JSON.stringify({
+      type: "whatsapp.message.received",
+      data: {
+        message: {
+          id: "wamid.route_retry",
+          type: "text",
+          text: { body: "Hola" },
+          kapso: { phone_number: "5215550100", phone_number_id: "demo_number" },
+        },
+        phone_number_id: "demo_number",
+      },
+    });
+    const request = () => created.app.request("/webhooks/kapso", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Webhook-Event": "whatsapp.message.received",
+        "X-Webhook-Signature": createHmac("sha256", secret).update(body).digest("hex"),
+      },
+      body,
+    });
+
+    expect((await request()).status).toBe(503);
+    expect((await request()).status).toBe(200);
+    expect(sends).toBe(2);
   });
 
   test("blocks public demo reset", async () => {

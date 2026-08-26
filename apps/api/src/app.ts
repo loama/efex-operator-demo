@@ -8,7 +8,8 @@ import { z, ZodError } from "zod";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { createDatabase, ensureSeeded, seedDatabase, type EfexDatabase } from "./database";
 import { createTreasuryService, TreasuryValidationError } from "./service";
-import { answerKapsoWebhook, parseKapsoMessages, verifyKapsoSignature } from "./kapso";
+import { answerKapsoWebhook, parseKapsoMessages, verifyKapsoSignature, type KapsoDeliveryClient } from "./kapso";
+import { createGroundedAssistant, type ModelRequester } from "./assistant";
 
 const quoteQuerySchema = z.object({
   sourceCurrency: currencySchema,
@@ -21,10 +22,16 @@ export function resolveRequestLimit(value: string | undefined) {
   return Number.isInteger(parsed) && parsed >= 1 && parsed <= 10_000 ? parsed : 120;
 }
 
-export function createApp(database?: EfexDatabase) {
+type AppOptions = {
+  modelRequester?: ModelRequester;
+  kapsoDeliveryClient?: KapsoDeliveryClient;
+};
+
+export function createApp(database?: EfexDatabase, options: AppOptions = {}) {
   const db = database ?? createDatabase();
   ensureSeeded(db);
   const service = createTreasuryService(db);
+  const assistant = createGroundedAssistant(service, { request: options.modelRequester });
   const app = new Hono();
   const configuredOrigins = new Set(
     (process.env.WEB_ORIGIN ?? "")
@@ -126,11 +133,11 @@ export function createApp(database?: EfexDatabase) {
     context.header("Content-Type", "application/pdf");
     return context.body(bytes.buffer as ArrayBuffer);
   });
-  app.post("/v1/assistant", zValidator("json", assistantRequestSchema), (context) =>
-    context.json(service.assistant(context.req.valid("json").message)),
+  app.post("/v1/assistant", zValidator("json", assistantRequestSchema), async (context) =>
+    context.json(await assistant(context.req.valid("json").message)),
   );
-  app.post("/v1/whatsapp/simulate", zValidator("json", assistantRequestSchema), (context) =>
-    context.json({ channel: "whatsapp", delivered: false, response: service.assistant(context.req.valid("json").message) }),
+  app.post("/v1/whatsapp/simulate", zValidator("json", assistantRequestSchema), async (context) =>
+    context.json({ channel: "whatsapp", delivered: false, response: await assistant(context.req.valid("json").message) }),
   );
   app.post("/webhooks/kapso", async (context) => {
     const rawBody = await context.req.text();
@@ -147,8 +154,13 @@ export function createApp(database?: EfexDatabase) {
     }
     const eventType = context.req.header("x-webhook-event") ?? (payload as { type?: string }).type;
     if (eventType !== "whatsapp.message.received") return context.json({ ok: true, processed: 0 });
-    const answers = await answerKapsoWebhook(service, payload);
-    return context.json({ ok: true, processed: answers.length });
+    try {
+      const answers = await answerKapsoWebhook(service, payload, options.kapsoDeliveryClient, assistant);
+      return context.json({ ok: true, processed: answers.length });
+    } catch (error) {
+      console.error("Kapso delivery failed", error);
+      return context.json({ error: "Kapso delivery is temporarily unavailable" }, 503);
+    }
   });
   app.post("/v1/demo/reset", (context) => {
     const hostname = new URL(context.req.url).hostname;
