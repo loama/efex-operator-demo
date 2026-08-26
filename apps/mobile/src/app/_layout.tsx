@@ -4,14 +4,15 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "../global.css";
+import { shouldMountApp } from "../lib/startup";
 
 void SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [loaded] = useFonts({
+  const [loaded, error] = useFonts({
     DMSansMedium: DMSans_500Medium,
     DMSansSemiBold: DMSans_600SemiBold,
     DMSansBold: DMSans_700Bold,
@@ -19,12 +20,19 @@ export default function RootLayout() {
     InterMedium: Inter_500Medium,
     InterSemiBold: Inter_600SemiBold,
   });
+  const [timedOut, setTimedOut] = useState(false);
+  const ready = shouldMountApp({ fontsLoaded: loaded, fontsFailed: Boolean(error), timedOut });
 
   useEffect(() => {
-    if (loaded) void SplashScreen.hideAsync();
-  }, [loaded]);
+    const timer = setTimeout(() => setTimedOut(true), 2500);
+    return () => clearTimeout(timer);
+  }, []);
 
-  if (!loaded) return null;
+  useEffect(() => {
+    if (ready) void SplashScreen.hideAsync();
+  }, [ready]);
+
+  if (!ready) return null;
 
   return (
     <SafeAreaProvider>
