@@ -29,4 +29,8 @@ describe("formatters", () => {
   });
   test("creates compact initials", () => expect(initials("Frutella Company")).toBe("FC"));
   test("uses deterministic compact currency", () => expect(compactMoney(350000, "USD")).toBe("$350K"));
+  test("keeps billion scale currency values compact", () => {
+    expect(compactMoney(987_654_321.09, "USD")).toBe("$987.65M");
+    expect(compactMoney(1_325_000_000, "ARS")).toBe("ARS 1.33B");
+  });
 });

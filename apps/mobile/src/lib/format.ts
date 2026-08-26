@@ -54,12 +54,22 @@ export function normalizeCurrencyInputChange(input: string, previousValue: strin
 
 export function compactMoney(amount: number, currency: string) {
   const symbol = currency === "USD" ? "$" : `${currency} `;
-  const compact = amount >= 1_000_000 ? `${trimDecimal(amount / 1_000_000)}M` : amount >= 1_000 ? `${trimDecimal(amount / 1_000)}K` : trimDecimal(amount);
+  const magnitude = Math.abs(amount);
+  const compact = magnitude >= 1_000_000_000_000
+    ? `${trimDecimal(amount / 1_000_000_000_000)}T`
+    : magnitude >= 1_000_000_000
+      ? `${trimDecimal(amount / 1_000_000_000)}B`
+      : magnitude >= 1_000_000
+        ? `${trimDecimal(amount / 1_000_000)}M`
+        : magnitude >= 1_000
+          ? `${trimDecimal(amount / 1_000)}K`
+          : trimDecimal(amount);
   return `${symbol}${compact}`;
 }
 
 function trimDecimal(value: number) {
-  return value.toFixed(1).replace(/\.0$/, "");
+  const rounded = Math.round((value + Math.sign(value) * Number.EPSILON) * 100) / 100;
+  return rounded.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
 }
 
 export function initials(name: string) {
