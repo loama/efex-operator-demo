@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { Href } from "expo-router";
 import { router } from "expo-router";
-import { useState } from "react";
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useRef, useState } from "react";
+import { ActivityIndicator, Keyboard, Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import type { AssistantResponse } from "@efex/contracts";
 import { AppShell } from "../components/app-shell";
 import { Button, Card, Pill } from "../components/ui";
@@ -13,16 +13,28 @@ type Message = { id: string; role: "user" | "assistant"; text: string; response?
 const prompts = ["¿Cuál es mi saldo?", "¿Cómo va mi último pago?", "Necesito mi estado de cuenta"];
 
 export default function AssistantScreen() {
-  const [input, setInput] = useState(""); const [messages, setMessages] = useState<Message[]>([{ id: "hello", role: "assistant", text: "Hola, Santiago. Puedo ayudarte a consultar saldos, pagos, beneficiarios y estados de cuenta usando los datos sintéticos de esta demo." }]); const [loading, setLoading] = useState(false); const [error, setError] = useState<string>();
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<Message[]>([{ id: "hello", role: "assistant", text: "Hola, Santiago. Puedo ayudarte a consultar saldos, pagos, beneficiarios y estados de cuenta usando los datos sintéticos de esta demo." }]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>();
   const [focusedControl, setFocusedControl] = useState<string>();
+  const inputRef = useRef<TextInput>(null);
+  const messageSequence = useRef(0);
+
+  function dismissKeyboard() {
+    inputRef.current?.blur();
+    Keyboard.dismiss();
+  }
+
   async function send(value = input) {
     const text = value.trim(); if (!text || loading) return;
-    setInput(""); setError(undefined); setMessages((current) => [...current, { id: crypto.randomUUID(), role: "user", text }]); setLoading(true);
+    messageSequence.current += 1;
+    setInput(""); setError(undefined); setMessages((current) => [...current, { id: `user_${Date.now()}_${messageSequence.current}`, role: "user", text }]); setLoading(true);
     try { const response = await api.assistant(text); setMessages((current) => [...current, { id: response.id, role: "assistant", text: response.text, response }]); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "No fue posible responder"); }
     finally { setLoading(false); }
   }
-  return <AppShell title="Asistente EFEX" subtitle="Las mismas operaciones pueden exponerse en WhatsApp, Slack, Teams o SMS.">
+  return <AppShell scrollToEndOnKeyboard title="Asistente EFEX" subtitle="Las mismas operaciones pueden exponerse en WhatsApp, Slack, Teams o SMS.">
     <View style={styles.layout}>
       <View style={styles.chatColumn}>
         <View style={styles.channelHeader}><View style={styles.channelIcon}><Ionicons color={colors.ink} name="chatbubble-ellipses" size={20} /></View><View style={styles.flex}><Text style={styles.channelTitle}>EFEX por WhatsApp</Text><Text style={styles.channelMeta}>La demo responde a mensajes entrantes. Las acciones actuales se envían como texto, enlaces y documentos compatibles.</Text></View><Pill tone="success">En línea</Pill></View>
@@ -33,7 +45,11 @@ export default function AssistantScreen() {
             {message.response?.attachment ? <Pressable accessibilityLabel={`Descargar ${message.response.attachment.label}`} accessibilityRole="button" onBlur={() => setFocusedControl(undefined)} onFocus={() => setFocusedControl(`${message.id}:attachment`)} onPress={() => void Linking.openURL(`${API_ORIGIN}${message.response!.attachment!.url}`)} style={[styles.actionCard, focusedControl === `${message.id}:attachment` && styles.controlFocused]}><Ionicons color={colors.ink} name="document-text-outline" size={18} /><Text style={styles.actionLabel}>{message.response.attachment.label}</Text><Ionicons color={colors.ink} name="download-outline" size={17} /></Pressable> : null}
           </View>)}{loading ? <View style={[styles.bubble, styles.assistantBubble, styles.typing]}><ActivityIndicator color={colors.ink} size="small" /><Text style={styles.typingText}>Consultando la cuenta demo</Text></View> : null}</View>
           {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-          <View style={styles.composer}><TextInput accessibilityLabel="Mensaje al asistente" multiline onChangeText={setInput} onSubmitEditing={() => void send()} placeholder="Pregunta sobre tu operación" placeholderTextColor={colors.muted} style={styles.input} value={input} /><Pressable accessibilityLabel="Enviar mensaje" accessibilityRole="button" disabled={!input.trim() || loading} onBlur={() => setFocusedControl(undefined)} onFocus={() => setFocusedControl("send")} onPress={() => void send()} style={[styles.send, focusedControl === "send" && styles.controlFocused, (!input.trim() || loading) && styles.sendDisabled]}><Ionicons color={colors.ink} name="arrow-up" size={20} /></Pressable></View>
+          <View style={styles.composer}>
+            <TextInput accessibilityLabel="Mensaje al asistente" multiline onChangeText={setInput} onSubmitEditing={() => void send()} placeholder="Pregunta sobre tu operación" placeholderTextColor={colors.muted} ref={inputRef} style={styles.input} value={input} />
+            <Pressable accessibilityLabel="Cerrar teclado" accessibilityRole="button" onPress={dismissKeyboard} style={({ pressed }) => [styles.dismiss, pressed && styles.controlPressed]}><Ionicons color={colors.inkSoft} name="chevron-down" size={19} /></Pressable>
+            <Pressable accessibilityLabel="Enviar mensaje" accessibilityRole="button" disabled={!input.trim() || loading} onBlur={() => setFocusedControl(undefined)} onFocus={() => setFocusedControl("send")} onPress={() => void send()} style={[styles.send, focusedControl === "send" && styles.controlFocused, (!input.trim() || loading) && styles.sendDisabled]}><Ionicons color={colors.ink} name="arrow-up" size={20} /></Pressable>
+          </View>
         </Card>
       </View>
       <View style={styles.sideColumn}>
@@ -45,5 +61,5 @@ export default function AssistantScreen() {
 }
 
 const styles = StyleSheet.create({
-  layout: { flexDirection: "row", flexWrap: "wrap", gap: 20 }, chatColumn: { flex: 2, gap: 12, minWidth: 320 }, sideColumn: { flex: 1, gap: 10, minWidth: 240 }, channelHeader: { alignItems: "center", backgroundColor: colors.ink, borderRadius: 12, flexDirection: "row", gap: 12, padding: 16 }, channelIcon: { alignItems: "center", backgroundColor: colors.yellow, borderRadius: 20, height: 40, justifyContent: "center", width: 40 }, flex: { flex: 1 }, channelTitle: { color: colors.paper, fontFamily: fonts.bodySemiBold, fontSize: 14 }, channelMeta: { color: "#A5A5A5", fontFamily: fonts.body, fontSize: 10, lineHeight: 15, marginTop: 3 }, chat: { gap: 14, minHeight: 470, padding: 16 }, messages: { flex: 1, gap: 10, justifyContent: "flex-end" }, bubble: { borderRadius: 12, maxWidth: "84%", padding: 12 }, userBubble: { alignSelf: "flex-end", backgroundColor: colors.ink }, assistantBubble: { alignSelf: "flex-start", backgroundColor: colors.canvas }, bubbleText: { color: colors.ink, fontFamily: fonts.body, fontSize: 13, lineHeight: 19 }, userText: { color: colors.paper }, actionCard: { alignItems: "center", backgroundColor: colors.paper, borderColor: colors.line, borderRadius: 9, borderWidth: 2, flexDirection: "row", gap: 8, marginTop: 10, minHeight: 42, paddingHorizontal: 11 }, controlFocused: { borderColor: colors.ink }, actionLabel: { color: colors.ink, flex: 1, fontFamily: fonts.bodySemiBold, fontSize: 11 }, typing: { alignItems: "center", flexDirection: "row", gap: 8 }, typingText: { color: colors.muted, fontFamily: fonts.body, fontSize: 11 }, composer: { alignItems: "flex-end", backgroundColor: colors.canvas, borderRadius: 12, flexDirection: "row", gap: 8, padding: 8 }, input: { color: colors.ink, flex: 1, fontFamily: fonts.body, fontSize: 14, maxHeight: 100, minHeight: 40, paddingHorizontal: 8, paddingVertical: 10 }, send: { alignItems: "center", backgroundColor: colors.yellow, borderColor: "transparent", borderRadius: 20, borderWidth: 2, height: 40, justifyContent: "center", width: 40 }, sendDisabled: { opacity: 0.4 }, error: { color: colors.red, fontFamily: fonts.body, fontSize: 11 }, quickTitle: { color: colors.ink, fontFamily: fonts.heading, fontSize: 16, marginBottom: 3 }, note: { gap: 9, marginTop: 10 }, noteTitle: { color: colors.ink, fontFamily: fonts.heading, fontSize: 15 }, noteText: { color: colors.muted, fontFamily: fonts.body, fontSize: 11, lineHeight: 18 },
+  layout: { flexDirection: "row", flexWrap: "wrap", gap: 20 }, chatColumn: { flex: 2, gap: 12, minWidth: 0 }, sideColumn: { flex: 1, gap: 10, minWidth: 240 }, channelHeader: { alignItems: "center", backgroundColor: colors.ink, borderRadius: 12, flexDirection: "row", gap: 12, padding: 16 }, channelIcon: { alignItems: "center", backgroundColor: colors.yellow, borderRadius: 20, height: 40, justifyContent: "center", width: 40 }, flex: { flex: 1, minWidth: 0 }, channelTitle: { color: colors.paper, fontFamily: fonts.bodySemiBold, fontSize: 14 }, channelMeta: { color: "#A5A5A5", fontFamily: fonts.body, fontSize: 10, lineHeight: 15, marginTop: 3 }, chat: { gap: 14, minHeight: 470, padding: 16 }, messages: { flex: 1, gap: 10, justifyContent: "flex-end" }, bubble: { borderRadius: 12, maxWidth: "84%", padding: 12 }, userBubble: { alignSelf: "flex-end", backgroundColor: colors.ink }, assistantBubble: { alignSelf: "flex-start", backgroundColor: colors.canvas }, bubbleText: { color: colors.ink, fontFamily: fonts.body, fontSize: 13, lineHeight: 19 }, userText: { color: colors.paper }, actionCard: { alignItems: "center", backgroundColor: colors.paper, borderColor: colors.line, borderRadius: 9, borderWidth: 2, flexDirection: "row", gap: 8, marginTop: 10, minHeight: 42, paddingHorizontal: 11 }, controlFocused: { borderColor: colors.ink }, controlPressed: { opacity: 0.7 }, actionLabel: { color: colors.ink, flex: 1, fontFamily: fonts.bodySemiBold, fontSize: 11 }, typing: { alignItems: "center", flexDirection: "row", gap: 8 }, typingText: { color: colors.muted, fontFamily: fonts.body, fontSize: 11 }, composer: { alignItems: "flex-end", backgroundColor: colors.canvas, borderRadius: 12, flexDirection: "row", gap: 6, padding: 8 }, input: { color: colors.ink, flex: 1, fontFamily: fonts.body, fontSize: 14, maxHeight: 100, minHeight: 40, minWidth: 0, paddingHorizontal: 8, paddingVertical: 10 }, dismiss: { alignItems: "center", height: 40, justifyContent: "center", width: 36 }, send: { alignItems: "center", backgroundColor: colors.yellow, borderColor: "transparent", borderRadius: 20, borderWidth: 2, height: 40, justifyContent: "center", width: 40 }, sendDisabled: { opacity: 0.4 }, error: { color: colors.red, fontFamily: fonts.body, fontSize: 11 }, quickTitle: { color: colors.ink, fontFamily: fonts.heading, fontSize: 16, marginBottom: 3 }, note: { gap: 9, marginTop: 10 }, noteTitle: { color: colors.ink, fontFamily: fonts.heading, fontSize: 15 }, noteText: { color: colors.muted, fontFamily: fonts.body, fontSize: 11, lineHeight: 18 },
 });

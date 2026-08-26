@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import type { Href } from "expo-router";
 import { router, usePathname } from "expo-router";
-import { useEffect, useState, type PropsWithChildren } from "react";
+import { useEffect, useRef, useState, type PropsWithChildren } from "react";
 import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useHydratedWindowWidth } from "../hooks/use-hydrated-window-width";
@@ -19,20 +19,28 @@ const navigation = [
 
 const future = ["Tarjetas corporativas", "Coberturas", "Crédito"];
 
-export function AppShell({ children, title, subtitle, action }: PropsWithChildren<{ title: string; subtitle?: string; action?: React.ReactNode }>) {
+export function AppShell({ children, title, subtitle, action, scrollToEndOnKeyboard = false }: PropsWithChildren<{ title: string; subtitle?: string; action?: React.ReactNode; scrollToEndOnKeyboard?: boolean }>) {
   const width = useHydratedWindowWidth();
   const desktop = width >= 900;
   const pathname = usePathname();
   const [focusedControl, setFocusedControl] = useState<string>();
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const mobileScrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-    const showSubscription = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const handleShow = () => {
+      setKeyboardVisible(true);
+      if (scrollToEndOnKeyboard) requestAnimationFrame(() => mobileScrollRef.current?.scrollToEnd({ animated: true }));
+    };
+    const showSubscription = Keyboard.addListener(showEvent, handleShow);
+    const settledSubscription = Platform.OS === "ios" && scrollToEndOnKeyboard
+      ? Keyboard.addListener("keyboardDidShow", () => mobileScrollRef.current?.scrollToEnd({ animated: true }))
+      : undefined;
     const hideSubscription = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
-    return () => { showSubscription.remove(); hideSubscription.remove(); };
-  }, []);
+    return () => { showSubscription.remove(); settledSubscription?.remove(); hideSubscription.remove(); };
+  }, [scrollToEndOnKeyboard]);
 
   const replacePrimaryRoute = (route: string) => router.replace(route as Href);
 
@@ -86,16 +94,18 @@ export function AppShell({ children, title, subtitle, action }: PropsWithChildre
   }
 
   return (
-    <SafeAreaView style={styles.mobileRoot}>
-      <View style={styles.mobileTopbar}>
-        <Image accessibilityLabel="EFEX" contentFit="contain" source={require("../../assets/images/efex-wordmark.png")} style={styles.logo} />
-        <View style={styles.mobileTopActions}>
-          <Pill tone="yellow">DEMO</Pill>
-          <Pressable accessibilityLabel="Abrir acceso de la empresa" accessibilityRole="button" onBlur={() => setFocusedControl(undefined)} onFocus={() => setFocusedControl("company")} onPress={() => router.push("/access")} style={[styles.mobileProfile, focusedControl === "company" && styles.mobileProfileFocused]}><Avatar label="SB" size={34} /></Pressable>
+    <View style={styles.mobileRoot}>
+      <SafeAreaView edges={["top"]} style={styles.mobileTopSafeArea}>
+        <View style={styles.mobileTopbar}>
+          <Image accessibilityLabel="EFEX" contentFit="contain" source={require("../../assets/images/efex-wordmark.png")} style={styles.logo} />
+          <View style={styles.mobileTopActions}>
+            <Pill tone="yellow">DEMO</Pill>
+            <Pressable accessibilityLabel="Abrir acceso de la empresa" accessibilityRole="button" onBlur={() => setFocusedControl(undefined)} onFocus={() => setFocusedControl("company")} onPress={() => router.push("/access")} style={[styles.mobileProfile, focusedControl === "company" && styles.mobileProfileFocused]}><Avatar label="SB" size={34} /></Pressable>
+          </View>
         </View>
-      </View>
+      </SafeAreaView>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.mobileBody}>
-        <ScrollView contentContainerStyle={[styles.mobileScroll, keyboardVisible && styles.mobileScrollKeyboard]} keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"} keyboardShouldPersistTaps="handled" style={styles.mobileMain}>
+        <ScrollView contentContainerStyle={[styles.mobileScroll, keyboardVisible && styles.mobileScrollKeyboard]} keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"} keyboardShouldPersistTaps="handled" ref={mobileScrollRef} style={styles.mobileMain}>
           <View style={styles.mobileHeader}>
             <Text style={styles.mobileTitle}>{title}</Text>
             {subtitle ? <Text style={styles.mobileSubtitle}>{subtitle}</Text> : null}
@@ -115,7 +125,7 @@ export function AppShell({ children, title, subtitle, action }: PropsWithChildre
           );
         })}
       </View> : null}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -149,6 +159,7 @@ const styles = StyleSheet.create({
   desktopSubtitle: { color: colors.muted, fontFamily: fonts.body, fontSize: 14 },
   desktopContent: { gap: 20, maxWidth: 1240, width: "100%" },
   mobileRoot: { backgroundColor: colors.canvas, flex: 1 },
+  mobileTopSafeArea: { backgroundColor: colors.ink },
   mobileTopbar: { alignItems: "center", backgroundColor: colors.ink, flexDirection: "row", height: 62, justifyContent: "space-between", paddingHorizontal: 20 },
   mobileTopActions: { alignItems: "center", flexDirection: "row", gap: 10 },
   mobileProfile: { borderColor: "transparent", borderRadius: 20, borderWidth: 2 },
