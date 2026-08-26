@@ -234,7 +234,7 @@ export function createTreasuryService(db: EfexDatabase) {
 
   function assistant(message: string): AssistantResponse {
     const normalized = message.toLocaleLowerCase("es");
-    if (normalized.includes("estado") || normalized.includes("statement")) {
+    if (normalized.includes("estado de cuenta") || normalized.includes("statement")) {
       return {
         id: crypto.randomUUID(),
         text: "Tu estado de cuenta de mayo está disponible. Incluye todos los movimientos de la cuenta USD.",
@@ -281,9 +281,15 @@ export function createTreasuryService(db: EfexDatabase) {
     ).run({ $messageId: messageId, $createdAt: now, $updatedAt: now });
     if (inserted.changes === 1) return { claimed: true, textSent: false, documentSent: false };
 
-    const existing = db.query<{ status: string; text_sent: number; document_sent: number }, string>(
-      "SELECT status, text_sent, document_sent FROM kapso_deliveries WHERE message_id = ?",
+    const existing = db.query<{ status: string; text_sent: number; document_sent: number; updated_at: string }, string>(
+      "SELECT status, text_sent, document_sent, updated_at FROM kapso_deliveries WHERE message_id = ?",
     ).get(messageId);
+    if (existing?.status === "processing" && Date.parse(existing.updated_at) <= Date.now() - 15_000) {
+      const reclaimed = db.prepare(
+        "UPDATE kapso_deliveries SET updated_at = $updatedAt WHERE message_id = $messageId AND status = 'processing' AND updated_at = $previousUpdatedAt",
+      ).run({ $messageId: messageId, $updatedAt: now, $previousUpdatedAt: existing.updated_at });
+      return { claimed: reclaimed.changes === 1, textSent: Boolean(existing.text_sent), documentSent: Boolean(existing.document_sent) };
+    }
     if (existing?.status !== "failed") return { claimed: false, textSent: Boolean(existing?.text_sent), documentSent: Boolean(existing?.document_sent) };
     const resumed = db.prepare("UPDATE kapso_deliveries SET status = 'processing', updated_at = $updatedAt WHERE message_id = $messageId AND status = 'failed'").run({
       $messageId: messageId,

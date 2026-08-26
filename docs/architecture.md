@@ -37,6 +37,8 @@ The public interface can create and submit payments. It cannot approve them or c
 
 ## WhatsApp behavior
 
-The inbound handler accepts Kapso webhook version two payloads. Signature validation runs before parsing. Text questions call the same assistant service as the app. Responses use plain text and native links. Statements use a PDF document attachment. No generated status images are necessary.
+The inbound handler accepts Kapso webhook version two payloads. Signature validation runs before parsing. Text questions call the same grounded assistant as the app. The OpenAI Responses API selects one typed read function from the customer question, but account records never enter model context. The server executes the selected function and constructs the final answer from synthetic treasury data. WhatsApp actions use native call to action buttons that open the relevant app screen. Statements use one PDF document with the answer in its caption. Status and balance replies do not require generated images.
+
+The production webhook is registered with Kapso buffering disabled, so each message gets its own request. The adapter also accepts a defensive batch of up to ten events. Each valid event remains inside the webhook request until its one bounded model call and one bounded Kapso delivery finish. Persistent message claims prevent duplicate replies, failed claims become retryable, and a fifteen second processing lease recovers work after a process interruption. An idempotency key protects a retried provider request.
 
 The local simulation endpoint returns the exact assistant payload without making an external request. This keeps assessment setup deterministic while leaving the real Kapso transport ready for controlled credentials.
